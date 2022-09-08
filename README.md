@@ -49,7 +49,15 @@ Implementing a meshless scheme for hydrodynamic particle simulations as describe
 ## Visualization
 
 ### Volume partition
-The volume partition for a random particle distribution and periodic boundary conditions is shown below:
+
+The fraction of volume $\psi_i\left(\vec{x}\right)$ assoziated with a particle $i$ is given by
+$$\psi_i\left(\vec{x}\right) \equiv \frac{1}{\omega(\vec{x})}W\left(\vec{x}-\vec{x}_i, h\left(\vec{x}\right)\right)$$
+
+where
+$$\omega\left(\vec{x}\right) = \sum_j W\left(\vec{x}-\vec{x}_j, h\left(\vec{x}\right)\right)$$
+
+and $h\left(\vec{x}\right)$ is some kernel size of the kernel function $W$.
+The volume partition for a random particle distribution and periodic boundary conditions and a cubic spline kernel is shown below:
 ![volumePartition](media/volumePartition.png)
 The plot can be generated in `snippets/volumePartition`.
 
