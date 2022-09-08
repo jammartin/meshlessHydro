@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# JetBrains projject files
+.idea
+# emacs autosave files
+*~
