@@ -1,6 +1,29 @@
 # meshlessHydro
 Implementing a meshless scheme for hydrodynamic particle simulations as described implemented in [GIZMO](http://www.tapir.caltech.edu/~phopkins/Site/GIZMO.html).
 
+## Implementation roadmap
+
+- [Volume partition](#volume-partition)
+
+### Gradient estimator
+For the method all gradients of a quantity $f$ are calculated consitently with locally-centered least-squares matrix gradient operators. A second-order accurate expression is given by 
+$$\left( \nabla f \right)_i^\alpha = 
+\sum_j (f_j - f_i)\tilde{\psi}_j^\alpha\left( \vec{x}_i \right)$$
+
+where $\tilde{\psi}_j^\alpha\left( \vec{x}_i \right)$ is somewhat complex helper function.
+
+
+### Riemann Solver
+
+ 
+ 
+
+
+
+
+
+
+
 ## Resources
 
 - [Paper describing the algorithm](https://arxiv.org/abs/1409.7395)
@@ -57,8 +80,11 @@ where
 $$\omega\left(\vec{x}\right) = \sum_j W\left(\vec{x}-\vec{x}_j, h\left(\vec{x}\right)\right)$$
 
 and $h\left(\vec{x}\right)$ is some kernel size of the kernel function $W$.
+
 The volume partition for a random particle distribution and periodic boundary conditions and a cubic spline kernel is shown below:
+
 ![volumePartition](media/volumePartition.png)
+
 The plot can be generated in `snippets/volumePartition`.
 
 ## Test problems

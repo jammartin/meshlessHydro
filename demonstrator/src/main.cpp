@@ -7,7 +7,7 @@
 
 #include "../include/Logger.h"
 #include "../include/ConfigParser.h"
-#include "../include/H5Profiler.h"
+#include "../include/MeshlessScheme.h"
 
 structlog LOGCFG = {};
 
@@ -17,7 +17,6 @@ int main(int argc, char *argv[]){
                                       "Demonstrator for the meshless hydrodynamic simulation methods MFV and MFM" };
     cmdLineOptions.add_options()
             ("c,config", "Path to config file", cxxopts::value<std::string>()->default_value("config.info"))
-            ("p,profiling", "Path to h5 profiling file", cxxopts::value<std::string>()->default_value("profiling.h5"))
             ("v,verbose", "More printouts for debugging")
             ("s,silent", "Suppress normal printouts")
             ("h,help", "Show this help");
@@ -26,16 +25,14 @@ int main(int argc, char *argv[]){
 
     if (cmdLineOpts.count("help")) {
         std::cout << cmdLineOptions.help() << std::endl;
-        env.abort(0);
+        exit(0);
     }
 
-    ConfigParser configParser { cmdLineOpts["config"].as<std::string>() };
+    ConfigParser confP { cmdLineOpts["config"].as<std::string>() };
 
     // initialize Logger
     LOGCFG.headers = true;
     LOGCFG.level = cmdLineOpts.count("verbose") ? DEBUG : INFO;
-    LOGCFG.myRank = myRank;
-    LOGCFG.outputRank = configParser.getVal<int>("outputRank");
 
     if (cmdLineOpts.count("silent")){
         if(cmdLineOpts.count("verbose")){
@@ -45,10 +42,55 @@ int main(int argc, char *argv[]){
         }
     }
 
-    // create singleton instance
-    H5Profiler::getInstance(cmdLineOpts["profiling"].as<std::string>(), myRank, numProcs);
+    Logger(INFO) << "Reading configuration ... ";
+    MeshlessScheme::Configuration config;
 
-    //TODO: call main algorithm
+    config.initFile = confP.getVal<std::string>("initFile");
+    Logger(INFO) << "    > Initial distribution: " << config.initFile;
+    config.outDir = confP.getVal<std::string>("outDir");
+    Logger(INFO) << "    > Output directory: " << config.outDir;
+    config.timeStep = confP.getVal<double>("timeStep");
+    Logger(INFO) << "    > Time step: " << config.timeStep;
+    config.timeEnd = confP.getVal<double>("timeEnd");
+    Logger(INFO) << "    > End of simulation: " << config.timeEnd;
+    config.h5DumpInterval = confP.getVal<int>("h5DumpInterval");
+    Logger(INFO) << "    > Dump data to h5 file every " << config.h5DumpInterval << " steps";
+    config.kernelSize = confP.getVal<double>("kernelSize");
+    Logger(INFO) << "    > Using global kernel size h = " << config.kernelSize;
+#if PERIODIC_BOUNDARIES
+    auto periodicBoxLimits = confP.getObj("periodicBoxLimits");
+    config.periodicBoxLimits[0] = periodicBoxLimits.getVal<double>("lowerX");
+    config.periodicBoxLimits[DIM] = periodicBoxLimits.getVal<double>("upperX");
+    config.periodicBoxLimits[1] = periodicBoxLimits.getVal<double>("lowerY");
+    config.periodicBoxLimits[DIM+1] = periodicBoxLimits.getVal<double>("upperY");
+#if DIM == 3
+    config.periodicBoxLimits[2] = periodicBoxLimits.getVal<double>("lowerZ");
+    config.periodicBoxLimits[DIM+2] = periodicBoxLimits.getVal<double>("upperZ");
+#endif
+    std::string periodicBoxStr = "[";
+    for (int i=0; i<2*DIM; i++){
+        periodicBoxStr.append(std::to_string(config.periodicBoxLimits[i]));
+        if(i<2*DIM-1) periodicBoxStr.append(", ");
+    }
+    Logger(INFO) << "    > Periodic boundaries within box: " << periodicBoxStr << "]";
+#else
+    //TODO: implement dynamic/fixed box size
+#endif
+
+    Logger(INFO) << "    > Reading initial distribution ...";
+
+    InitialDistribution initDist { config.initFile };
+    Particles particles { initDist.getNumberOfParticles() };
+    initDist.getAllParticles(particles);
+
+    Logger(INFO) << "    > N = " << particles.N;
+    Logger(INFO) << "... done. Initializing simulation ...";
+
+    double *domainLimits = config.periodicBoxLimits;
+    Domain::Cell boundingBox { domainLimits };
+    MeshlessScheme algorithm { config, &particles, boundingBox };
+
+    Logger(INFO) << "... done.";
 
     return 0;
 }
