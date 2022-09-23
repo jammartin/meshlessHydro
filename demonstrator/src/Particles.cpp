@@ -22,6 +22,11 @@ Particles::Particles(int numParticles) : N { numParticles }{
 #endif
     nnl = new int[numParticles*MAX_NUM_INTERACTIONS];
     noi = new int[numParticles];
+#if PERIODIC_BOUNDARIES
+    // estimated memory allocation
+    nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
+    noiGhosts = new int[numParticles];
+#endif
 }
 
 Particles::~Particles(){
@@ -41,6 +46,10 @@ Particles::~Particles(){
 #endif
     delete[] nnl;
     delete[] noi;
+#if PERIODIC_BOUNDARIES
+    delete[] nnlGhosts;
+    delete[] noiGhosts;
+#endif
 }
 
 void Particles::assignParticlesAndCells(Domain &domain){
@@ -57,7 +66,7 @@ void Particles::assignParticlesAndCells(Domain &domain){
     }
 }
 
-void Particles::gridNNS(Domain &domain, double kernelSize){
+void Particles::gridNNS(Domain &domain, const double &kernelSize){
     // loop over particles
     for(int i=0; i<N; ++i){
         int numSearchCells = pow(3, DIM);
@@ -67,11 +76,11 @@ void Particles::gridNNS(Domain &domain, double kernelSize){
         domain.getNeighborCells(cell[i], cells);
         // do nearest neighbor search
         int noiBuf = 0;
-        double hSqr = kernelSize * kernelSize;
+        const double hSqr = kernelSize * kernelSize;
         for (int iNeighbor=0; iNeighbor<numSearchCells; ++iNeighbor){
             // loop over particle indices in all
             if (cells[iNeighbor] < 0){
-                // handle ghost cells
+                // handle ghost cells in external function
             } else {
                 for(auto const &iPrtcl : domain.grid[cells[iNeighbor]].prtcls){
                     double dSqr = pow(x[iPrtcl] - x[i], 2)
@@ -81,7 +90,7 @@ void Particles::gridNNS(Domain &domain, double kernelSize){
 #endif
                     if (dSqr < hSqr){
                         if(noiBuf >= MAX_NUM_INTERACTIONS){
-                            Logger(ERROR) << "MAX_NUM_INTERACTIONS exeeded for particle "
+                            Logger(ERROR) << "MAX_NUM_INTERACTIONS exceeded for particle "
                                                << i << " - Aborting.";
                             exit(1);
                         }
@@ -95,13 +104,14 @@ void Particles::gridNNS(Domain &domain, double kernelSize){
     }
 }
 
-void Particles::compDensity(double kernelSize){
+
+void Particles::compDensity(const double &kernelSize){
     for(int i=0; i<N; ++i){
-        rho[i] = m[i]/compVolume(i, kernelSize);
+        rho[i] = m[i]*compOmega(i, kernelSize);
     }
 }
 
-double Particles::compVolume(int i, const double &kernelSize){
+double Particles::compOmega(int i, const double &kernelSize){
     double omega = 0;
     for (int j=0; j<noi[i]; ++j){
         double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
@@ -112,8 +122,88 @@ double Particles::compVolume(int i, const double &kernelSize){
         double r = sqrt(dSqr);
         omega += kernel(r, kernelSize);
     }
-    return 1./omega;
+    return omega;
 }
+
+#if PERIODIC_BOUNDARIES
+void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
+                                     const double &kernelSize){
+    int iGhost = 0;
+    for(int i=0; i<N; ++i) {
+        bool foundGhost = false;
+
+        if (x[i] < domain.bounds.minX + kernelSize) {
+            ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
+            foundGhost = true;
+        } else if (domain.bounds.maxX - kernelSize <= x[i]) {
+            ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
+            foundGhost = true;
+        } else {
+            ghostParticles.x[iGhost] = x[i];
+        }
+        if (y[i] < domain.bounds.minY + kernelSize) {
+            ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
+            foundGhost = true;
+        } else if (domain.bounds.maxY - kernelSize <= y[i]) {
+            ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
+            foundGhost = true;
+        } else {
+            ghostParticles.y[iGhost] = y[i];
+        }
+        if (foundGhost) ++iGhost;
+#if DIM == 3
+        Logger(ERROR) << "Ghost cells not implemented for 3D simulations. - Aborting.";
+        exit(2);
+#endif
+    }
+    ghostParticles.N = iGhost;
+}
+
+void Particles::ghostNNS(Domain &domain, const Particles &ghostParticles, const double &kernelSize){
+    const double hSqr = kernelSize * kernelSize;
+    for(int i=0; i<N; ++i){
+        int noiBuf = 0;
+        for(int iGhost=0; iGhost<ghostParticles.N; ++iGhost){
+            double dSqr = pow(ghostParticles.x[iGhost] - x[i], 2)
+                          + pow(ghostParticles.y[iGhost] - y[i], 2);
+#if DIM == 3
+            Logger(ERROR) << "Ghost cells not implemented for 3D simulations. - Aborting.";
+        exit(2);
+#endif
+            if (dSqr < hSqr){
+                if(noiBuf >= MAX_NUM_GHOST_INTERACTIONS){
+                    Logger(ERROR) << "MAX_NUM_GHOST_INTERACTIONS exceeded for particle "
+                                  << i << " - Aborting.";
+                    exit(3);
+                }
+                nnlGhosts[noiBuf+i*MAX_NUM_GHOST_INTERACTIONS] = iGhost;
+                ++noiBuf;
+            }
+        }
+        noiGhosts[i] = noiBuf;
+    }
+}
+
+void Particles::compDensity(const Particles &ghostParticles, const double &kernelSize){
+    for(int i=0; i<N; ++i){
+        rho[i] = m[i]*(compOmega(i, kernelSize)+compOmega(i, ghostParticles, kernelSize));
+    }
+}
+
+double Particles::compOmega(int i, const Particles &ghostParticles, const double &kernelSize){
+    double omega = 0;
+    for (int j=0; j<noiGhosts[i]; ++j){
+        double dSqr = pow(x[i] - ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2)
+                      + pow(y[i] - ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
+#if DIM == 3
+        dSqr += pow(z[i] - ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
+#endif
+        double r = sqrt(dSqr);
+        omega += kernel(r, kernelSize);
+    }
+    return omega;
+}
+#endif
 
 void Particles::dump2file(std::string filename){
     // open output file

@@ -29,16 +29,29 @@ public:
     double *z, *vz;
 #endif
     void assignParticlesAndCells(Domain &domain);
-    void gridNNS(Domain &domain, double kernelSize);
-    void compDensity(double kernelSize);
+    void gridNNS(Domain &domain, const double &kernelSize);
+    void compDensity(const double &kernelSize);
+
+#if PERIODIC_BOUNDARIES
+    void createGhostParticles(Domain &domain,
+                              Particles &ghostParticles, const double &kernelSize);
+    void ghostNNS(Domain &domain, const Particles &ghostParticles, const double &kernelSize);
+    void compDensity(const Particles &ghostParticles, const double &kernelSize);
+#endif
 
     void dump2file(std::string filename);
 
 private:
     int *nnl; // nearest neighbor list
     int *noi;  // number of interactions
-    double compVolume(int i, const double &kernelSize);
+    double compOmega(int i, const double &kernelSize);
     double (*kernel)(const double&, const double&){ &Kernel::cubicSpline };
+
+#if PERIODIC_BOUNDARIES
+    double compOmega(int i, const Particles &ghostParticles, const double &kernelSize);
+    int *nnlGhosts;
+    int *noiGhosts;
+#endif
 
 
 };

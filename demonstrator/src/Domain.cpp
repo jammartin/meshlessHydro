@@ -6,7 +6,7 @@
 
 Domain::Domain(Cell bounds) : bounds { bounds }{}
 
-void Domain::createGrid(double kernelSize){
+void Domain::createGrid(const double &kernelSize){
     cellsX = ceil((bounds.maxX - bounds.minX)/kernelSize);
     cellsY = ceil((bounds.maxY - bounds.minY)/kernelSize);
 #if DIM == 3
@@ -34,16 +34,15 @@ void Domain::createGrid(double kernelSize){
     for(int iX=0; iX<cellsX; ++iX){
         for(int iY=0; iY<cellsY; ++iY){
 #if DIM == 2
-            double cellBounds[] = { iX*cellSizeX + (iX+1)*cellSizeX,
-                                    iY*cellSizeY + (iY+1)*cellSizeY };
+            double cellBounds[] = { iX*cellSizeX+bounds.minX, iY*cellSizeY+bounds.minY,
+                                    (iX+1)*cellSizeX+bounds.minX, (iY+1)*cellSizeY+bounds.minY };
             grid[iX+iY*cellsX] = Cell(cellBounds);
             dimIndex[iX+iY*cellsX][0] = iX;
             dimIndex[iX+iY*cellsX][1] = iY;
 #else
             for(int iZ=0; iZ<cellsZ; ++iZ){
-                double cellBounds[] = { iX*cellSizeX + (iX+1)*cellSizeX,
-                                        iY*cellSizeY + (iY+1)*cellSizeY,
-                                        iZ*cellSizeZ + (iZ+1)*cellSizeZ };
+                double cellBounds[] = { iX*cellSizeX+bounds.minX, iY*cellSizeY+bounds.minY, iZ*cellSizeZ+bounds.minZ,
+                                        (iX+1)*cellSizeX+bounds.minX, (iY+1)*cellSizeY+bounds.minY, (iZ+1)*cellSizeZ+bounds.minZ };
                 grid[iX+iY*cellsX+iZ*cellsX*cellsY] = Cell(cellBounds);
                 dimIndex[iX+iY*cellsX+iZ*cellsX*cellsY][0] = iX;
                 dimIndex[iX+iY*cellsX+iZ*cellsX*cellsY][1] = iY;
@@ -54,7 +53,34 @@ void Domain::createGrid(double kernelSize){
     }
 }
 
-void Domain::getNeighborCells(int iCell, int *neighborCell){
+/*#if PERIODIC_BOUNDARIES
+void Domain::createGhostGrid(){
+    numGhostCells = DIM*(cellsX+cellsY+DIM);
+    ghostGrid = std::vector<Cell>(numGhostCells);
+    ghostDimIndex = new int[numGhostCells][DIM];
+
+    int iGhost = 0;
+#if DIM ==2
+    for(int iY=-1; iY<=cellsY; ++iY){
+        for(int iX=-1; iX<=cellsX; ++iX){
+            if(iY==-1 || iY==cellsY || iX==-1 || iX==cellsX){
+                double cellBounds[] = { iX*cellSizeX+bounds.minX, iY*cellSizeY+bounds.minY,
+                                        (iX+1)*cellSizeX+bounds.minX, (iY+1)*cellSizeY+bounds.minY };
+                ghostGrid[iGhost] = Cell(cellBounds);
+                ghostDimIndex[iGhost][0] = iX;
+                ghostDimIndex[iGhost][1] = iY;
+                ++iGhost;
+            }
+        }
+    }
+#else
+    Logger(ERROR) << "Ghost cells not implemented for 3D simulations. - Aborting.";
+    exit(2);
+#endif
+}
+#endif*/
+
+void Domain::getNeighborCells(const int &iCell, int *neighborCell){
     // recover iX, iY and iZ
     int iX = dimIndex[iCell][0];
     int iY = dimIndex[iCell][1];

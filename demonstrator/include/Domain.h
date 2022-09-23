@@ -46,8 +46,14 @@ public:
     int numGridCells { 0 };
     std::vector<Cell> grid;
 
-    void createGrid(double kernelSize);
-    void getNeighborCells(int iCell, int *neighborCells);
+/*#if PERIODIC_BOUNDARIES
+    int numGhostCells { 0 };
+    std::vector<Cell> ghostGrid;
+    void createGhostGrid();
+#endif*/
+
+    void createGrid(const double &kernelSize);
+    void getNeighborCells(const int &iCell, int *neighborCells);
 
     Cell bounds; // global cell
     // number of grid cells in each dimension
@@ -62,6 +68,9 @@ public:
 #endif
 private:
     int (*dimIndex)[DIM] { nullptr };
+/*#if PERIODIC_BOUNDARIES
+    int (*ghostDimIndex)[DIM] { nullptr };
+#endif*/
 };
 
 

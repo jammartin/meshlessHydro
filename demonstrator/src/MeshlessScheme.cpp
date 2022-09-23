@@ -31,10 +31,28 @@ MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
     particles->assignParticlesAndCells(domain);
     Logger(INFO) << "    > ... done.";
     Logger(INFO) << "    > Preparing simulation ...";
+#if PERIODIC_BOUNDARIES
+    Logger(INFO) << "    > Creating ghost particles ...";
+    //Logger(DEBUG) << "      > Creating ghost grid";
+    //domain.createGhostGrid();
+    Logger(DEBUG) << "      > Creating ghost particles ... ";
+    Particles ghostParticles { particles->N/(DIM*2) };
+    particles->createGhostParticles(domain, ghostParticles, config.kernelSize);
+    Logger(DEBUG) << "      > ... found " << ghostParticles.N << " ghosts";
+    Logger(INFO) << "    > ... done.";
+
+#endif
     Logger(DEBUG) << "      > Nearest neighbor search";
     particles->gridNNS(domain, config.kernelSize);
+#if PERIODIC_BOUNDARIES
+    particles->ghostNNS(domain, ghostParticles, config.kernelSize);
+#endif
     Logger(DEBUG) << "      > Computing density";
+#ifdef PERIODIC_BOUNDARIES
+    particles->compDensity(ghostParticles, config.kernelSize);
+#else
     particles->compDensity(config.kernelSize);
+#endif
     Logger(DEBUG) << "      > Writing ICs to output";
     particles->dump2file(config.outDir + std::string("/ic.h5"));
 }
