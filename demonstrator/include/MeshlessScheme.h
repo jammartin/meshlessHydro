@@ -5,10 +5,13 @@
 #ifndef DEMONSTRATOR_MESHLESSSCHEME_H
 #define DEMONSTRATOR_MESHLESSSCHEME_H
 
+#include <iomanip>
+
 #include "parameter.h"
 #include "InitialDistribution.h"
 #include "Logger.h"
 #include "Domain.h"
+#include "Helper.h"
 
 class MeshlessScheme {
 
@@ -21,6 +24,7 @@ public:
         int h5DumpInterval;
         double periodicBoxLimits[2 * DIM];
         double kernelSize;
+        double gamma; // adiabatic index
     };
 
     MeshlessScheme(Configuration config, Particles *particles, Domain::Cell domain);
@@ -31,7 +35,11 @@ public:
 private:
     Configuration config;
     Particles *particles;
+#if PERIODIC_BOUNDARIES
+    Particles ghostParticles;
+#endif
     Domain domain;
+    Helper helper {};
 };
 
 

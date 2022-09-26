@@ -12,10 +12,10 @@
 #define PERIODIC_BOUNDARIES 1
 
 /// maximum number of interactions for each particle
-#define MAX_NUM_INTERACTIONS 180
+#define MAX_NUM_INTERACTIONS 1000
 /** maximum interactions with ghost particles
  *  ignored when `PERIODIC_BOUNDARIES` is not set
 **/
-#define MAX_NUM_GHOST_INTERACTIONS 135
+#define MAX_NUM_GHOST_INTERACTIONS 750
 
 #endif //DEMONSTRATOR_PARAMETER_H

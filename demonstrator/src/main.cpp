@@ -57,6 +57,8 @@ int main(int argc, char *argv[]){
     Logger(INFO) << "    > Dump data to h5 file every " << config.h5DumpInterval << " steps";
     config.kernelSize = confP.getVal<double>("kernelSize");
     Logger(INFO) << "    > Using global kernel size h = " << config.kernelSize;
+    config.gamma = confP.getVal<double>("gamma");
+    Logger(INFO) << "    > Adiabatic index for ideal gas EOS gamma = " << config.gamma;
 #if PERIODIC_BOUNDARIES
     auto periodicBoxLimits = confP.getObj("periodicBoxLimits");
     config.periodicBoxLimits[0] = periodicBoxLimits.getVal<double>("lowerX");
@@ -92,5 +94,8 @@ int main(int argc, char *argv[]){
 
     Logger(INFO) << "... done.";
 
+    Logger(INFO) << "Starting time integration.";
+    algorithm.run();
+    Logger(INFO) << "Finished!";
     return 0;
 }

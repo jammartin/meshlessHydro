@@ -5,10 +5,10 @@ initFile ../testcases/kelvin-helmholtz/khN100000.h5
 outDir output
 
 ; fixed time step
-timeStep .01
+timeStep .05
 
 ; end of the simulation
-timeEnd 50.
+timeEnd .5
 
 ; output particle distribution each h5DumpInterval steps
 h5DumpInterval 10
@@ -26,3 +26,6 @@ periodicBoxLimits {
 
 ; kernel size for meshless scheme
 kernelSize .01
+
+; adiabatic index
+gamma 1.6666666666666667

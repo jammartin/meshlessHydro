@@ -7,6 +7,7 @@ Implementing a meshless scheme for hydrodynamic particle simulations as describe
 
 ### Gradient estimator
 For the method all gradients of a quantity $f$ are calculated consitently with locally-centered least-squares matrix gradient operators. A second-order accurate expression is given by 
+
 $$\left( \nabla f \right)_i^\alpha = 
 \sum_j (f_j - f_i)\tilde{\psi}_j^\alpha\left( \vec{x}_i \right)$$
 

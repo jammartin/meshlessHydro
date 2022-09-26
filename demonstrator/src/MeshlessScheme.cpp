@@ -19,46 +19,76 @@ double Kernel::cubicSpline(const double &r, const double &h) {
 
 MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
                                Domain::Cell bounds) : config { config }, particles { particles },
-                                                      domain(bounds){
+                                                      domain(bounds), ghostParticles(particles->N/(DIM*2)){
 
     Logger(INFO) << "    > Creating grid ... ";
-
     domain.createGrid(config.kernelSize);
-
     Logger(INFO) << "    > ... got " << domain.numGridCells << " cells";
-
-    Logger(INFO) << "    > Assigning particles ...";
-    particles->assignParticlesAndCells(domain);
-    Logger(INFO) << "    > ... done.";
-    Logger(INFO) << "    > Preparing simulation ...";
-#if PERIODIC_BOUNDARIES
-    Logger(INFO) << "    > Creating ghost particles ...";
-    //Logger(DEBUG) << "      > Creating ghost grid";
-    //domain.createGhostGrid();
-    Logger(DEBUG) << "      > Creating ghost particles ... ";
-    Particles ghostParticles { particles->N/(DIM*2) };
-    particles->createGhostParticles(domain, ghostParticles, config.kernelSize);
-    Logger(DEBUG) << "      > ... found " << ghostParticles.N << " ghosts";
-    Logger(INFO) << "    > ... done.";
-
-#endif
-    Logger(DEBUG) << "      > Nearest neighbor search";
-    particles->gridNNS(domain, config.kernelSize);
-#if PERIODIC_BOUNDARIES
-    particles->ghostNNS(domain, ghostParticles, config.kernelSize);
-#endif
-    Logger(DEBUG) << "      > Computing density";
-#ifdef PERIODIC_BOUNDARIES
-    particles->compDensity(ghostParticles, config.kernelSize);
-#else
-    particles->compDensity(config.kernelSize);
-#endif
-    Logger(DEBUG) << "      > Writing ICs to output";
-    particles->dump2file(config.outDir + std::string("/ic.h5"));
 }
 
 void MeshlessScheme::run(){
+    double t = 0;
+    int step = 0;
+    do {
+        std::stringstream stepss;
+        stepss << std::setw(6) << std::setfill('0') << step;
 
+        Logger(INFO) << "    > Assigning particles ...";
+        particles->assignParticlesAndCells(domain);
+        Logger(INFO) << "    > ... done.";
+#if PERIODIC_BOUNDARIES
+        Logger(INFO) << "    > Creating ghost particles ...";
+        //Logger(DEBUG) << "      > Creating ghost grid";
+        //domain.createGhostGrid();
+        Logger(DEBUG) << "      > Creating ghost particles ... ";
+        particles->createGhostParticles(domain, ghostParticles, config.kernelSize);
+        Logger(DEBUG) << "      > ... found " << ghostParticles.N << " ghosts";
+        Logger(INFO) << "    > ... done.";
+
+#endif
+        Logger(INFO) << "    > Nearest neighbor search";
+        particles->gridNNS(domain, config.kernelSize);
+#if PERIODIC_BOUNDARIES
+        Logger(DEBUG) << "      > Ghosts NNS";
+        particles->ghostNNS(domain, ghostParticles, config.kernelSize);
+#endif
+        Logger(INFO) << "    > Computing density";
+        particles->compDensity(config.kernelSize);
+#if PERIODIC_BOUNDARIES
+        particles->compDensity(ghostParticles, config.kernelSize);
+#endif
+        Logger(INFO) << "    > Computing pressure";
+        particles->compPressure(config.gamma);
+
+        Logger(INFO) << "    > Computing gradients";
+#if PERIODIC_BOUNDARIES
+        particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
+        particles->gradient(particles->rho, particles->rhoGrad, ghostParticles);
+        particles->gradient(particles->vx, particles->vxGrad, ghostParticles);
+        particles->gradient(particles->vy, particles->vyGrad, ghostParticles);
+#if DIM == 3
+        particles->gradient(particles->vz, particles->vzGrad, ghostParticles);
+#endif
+        particles->gradient(particles->P, particles->PGrad, ghostParticles);
+#else
+        particles->compPsijTilde(helper, config.kernelSize);
+        particles->gradient(particles->rho, particles->rhoGrad);
+        particles->gradient(particles->vx, particles->vxGrad);
+        particles->gradient(particles->vy, particles->vyGrad);
+#if DIM == 3
+        particles->gradient(particles->vz, particles->vzGrad);
+#endif
+        particles->gradient(particles->P, particles->PGrad);
+#endif
+        Logger(INFO) << "    > Dump particles to file";
+        particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+
+        Logger(INFO) << "    > Moving particles";
+        particles->move(config.timeStep, domain);
+
+        t += config.timeStep;
+        ++step;
+    } while(t<=config.timeEnd);
 }
 
 MeshlessScheme::~MeshlessScheme(){}

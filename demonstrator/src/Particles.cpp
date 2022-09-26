@@ -11,17 +11,24 @@ Particles::Particles(int numParticles) : N { numParticles }{
     m = new double[numParticles];
     u = new double[numParticles];
     rho = new double[numParticles];
-    p = new double[numParticles];
+    P = new double[numParticles];
     x = new double[numParticles];
     y = new double[numParticles];
     vx = new double[numParticles];
     vy = new double[numParticles];
+    rhoGrad = new double[numParticles][DIM];
+    vxGrad = new double[numParticles][DIM];
+    vyGrad = new double[numParticles][DIM];
+    vzGrad = new double[numParticles][DIM];
+    PGrad = new double[numParticles][DIM];
 #if DIM == 3
     z = new double[numParticles];
     vz = new double[numParticles];
 #endif
     nnl = new int[numParticles*MAX_NUM_INTERACTIONS];
     noi = new int[numParticles];
+    omega = new double[numParticles];
+    psijTilde_xi = new double[numParticles][DIM];
 #if PERIODIC_BOUNDARIES
     // estimated memory allocation
     nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
@@ -34,18 +41,25 @@ Particles::~Particles(){
     delete[] cell;
     delete[] m;
     delete[] u;
-    delete[] p;
+    delete[] P;
     delete[] rho;
     delete[] x;
     delete[] y;
     delete[] vx;
     delete[] vy;
+    delete[] rhoGrad;
+    delete[] vxGrad;
+    delete[] vyGrad;
+    delete[] vzGrad;
+    delete[] PGrad;
 #if DIM == 3
     delete[] z;
     delete[] vz;
 #endif
     delete[] nnl;
     delete[] noi;
+    delete[] omega;
+    delete[] psijTilde_xi;
 #if PERIODIC_BOUNDARIES
     delete[] nnlGhosts;
     delete[] noiGhosts;
@@ -107,12 +121,13 @@ void Particles::gridNNS(Domain &domain, const double &kernelSize){
 
 void Particles::compDensity(const double &kernelSize){
     for(int i=0; i<N; ++i){
-        rho[i] = m[i]*compOmega(i, kernelSize);
+        compOmega(i, kernelSize);
+        rho[i] = m[i]*omega[i];
     }
 }
 
-double Particles::compOmega(int i, const double &kernelSize){
-    double omega = 0;
+void Particles::compOmega(int i, const double &kernelSize){
+    double omg = 0;
     for (int j=0; j<noi[i]; ++j){
         double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
                     + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
@@ -120,9 +135,93 @@ double Particles::compOmega(int i, const double &kernelSize){
         dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
 #endif
         double r = sqrt(dSqr);
-        omega += kernel(r, kernelSize);
+        omg += kernel(r, kernelSize);
     }
-    return omega;
+    omega[i] = omg;
+}
+
+void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
+
+    for (int i=0; i<N; ++i){
+
+        // reset buffer
+        for (int k=0; k<DIM*DIM; ++k){
+            B[k] = 0.;
+        }
+
+        for (int alpha = 0; alpha < DIM; ++alpha) {
+            psijTilde_xi[i][alpha] = 0.;
+        }
+
+        xi[0] = x[i];
+        xi[1] = y[i];
+#if DIM==3
+        xi[2] = z[i];
+#endif
+
+        for (int j=0; j<noi[i]; ++j){
+
+            double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize)/omega[i];
+
+            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#if DIM==3
+            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#endif
+
+            for (int alpha=0; alpha<DIM; ++alpha){
+                for(int beta=0; beta<DIM; ++beta){
+                    B[alpha+DIM*beta] += (xj[alpha] - xi[alpha])*(xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+
+        helper.inverseMatrix(B, DIM);
+
+        for (int j=0; j<noi[i]; ++j) {
+
+            double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize) / omega[i];
+
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                psijTilde_xi[i][alpha] = 0.;
+                for (int beta = 0; beta < DIM; ++beta) {
+                    psijTilde_xi[i][alpha] += B[alpha + beta * DIM] * (xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+    }
+}
+
+void Particles::gradient(double *f, double (*grad)[DIM]){
+    for (int i=0; i<N; ++i) {
+        for (int alpha = 0; alpha < DIM; ++alpha) {
+            grad[i][alpha] = 0;
+        }
+
+        for (int j = 0; j < noi[i]; ++j) {
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                grad[i][alpha] += (f[i] - f[nnl[j + i * MAX_NUM_INTERACTIONS]]) * psijTilde_xi[i][alpha];
+            }
+        }
+    }
+}
+
+void Particles::compPressure(const double &gamma){
+    for (int i=0; i<N; ++i){
+        P[i] = (gamma-1.)*rho[i]*u[i];
+    }
 }
 
 #if PERIODIC_BOUNDARIES
@@ -186,12 +285,13 @@ void Particles::ghostNNS(Domain &domain, const Particles &ghostParticles, const 
 
 void Particles::compDensity(const Particles &ghostParticles, const double &kernelSize){
     for(int i=0; i<N; ++i){
-        rho[i] = m[i]*(compOmega(i, kernelSize)+compOmega(i, ghostParticles, kernelSize));
+        compOmega(i, ghostParticles, kernelSize);
+        rho[i] = m[i]*omega[i];
     }
 }
 
-double Particles::compOmega(int i, const Particles &ghostParticles, const double &kernelSize){
-    double omega = 0;
+void Particles::compOmega(int i, const Particles &ghostParticles, const double &kernelSize){
+    double omg = omega[i];
     for (int j=0; j<noiGhosts[i]; ++j){
         double dSqr = pow(x[i] - ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2)
                       + pow(y[i] - ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
@@ -199,11 +299,165 @@ double Particles::compOmega(int i, const Particles &ghostParticles, const double
         dSqr += pow(z[i] - ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
 #endif
         double r = sqrt(dSqr);
-        omega += kernel(r, kernelSize);
+        omg += kernel(r, kernelSize);
     }
-    return omega;
+    omega[i] = omg;
 }
+
+void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize){
+    for (int i=0; i<N; ++i){
+
+        // reset buffer
+        for (int k=0; k<DIM*DIM; ++k){
+            B[k] = 0.;
+        }
+
+        for (int alpha = 0; alpha < DIM; ++alpha) {
+            psijTilde_xi[i][alpha] = 0.;
+        }
+
+        xi[0] = x[i];
+        xi[1] = y[i];
+#if DIM==3
+        xi[2] = z[i];
 #endif
+
+        for (int j=0; j<noi[i]; ++j){
+
+            double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize)/omega[i];
+
+            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#if DIM==3
+            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#endif
+
+            for (int alpha=0; alpha<DIM; ++alpha){
+                for(int beta=0; beta<DIM; ++beta){
+                    B[alpha+DIM*beta] += (xj[alpha] - xi[alpha])*(xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+
+        for (int j=0; j<noiGhosts[i]; ++j){
+
+            double dSqr = pow(x[i] - x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize)/omega[i];
+
+            xj[0] = x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+            xj[1] = y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+#if DIM==3
+            xj[2] = z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+#endif
+
+            for (int alpha=0; alpha<DIM; ++alpha){
+                for(int beta=0; beta<DIM; ++beta){
+                    B[alpha+DIM*beta] += (xj[alpha] - xi[alpha])*(xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+
+        helper.inverseMatrix(B, DIM);
+
+        for (int j=0; j<noi[i]; ++j) {
+
+            double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize) / omega[i];
+
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                psijTilde_xi[i][alpha] = 0.;
+                for (int beta = 0; beta < DIM; ++beta) {
+                    psijTilde_xi[i][alpha] += B[alpha + beta * DIM] * (xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+
+        for (int j=0; j<noiGhosts[i]; ++j) {
+
+            double dSqr = pow(x[i] - x[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]], 2)
+                          + pow(y[i] - y[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
+#endif
+            double r = sqrt(dSqr);
+            double psij_xi = kernel(r, kernelSize) / omega[i];
+
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                for (int beta = 0; beta < DIM; ++beta) {
+                    psijTilde_xi[i][alpha] += B[alpha + beta * DIM] * (xj[beta] - xi[beta]) * psij_xi;
+                }
+            }
+        }
+    }
+}
+
+void Particles::gradient(double *f, double (*grad)[DIM], const Particles &ghostParticles){
+    for (int i=0; i<N; ++i) {
+        for (int alpha = 0; alpha < DIM; ++alpha) {
+            grad[i][alpha] = 0;
+        }
+
+        for (int j = 0; j < noi[i]; ++j) {
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                grad[i][alpha] += (f[i] - f[nnl[j + i * MAX_NUM_INTERACTIONS]]) * psijTilde_xi[i][alpha];
+            }
+        }
+
+        for (int j = 0; j < noiGhosts[i]; ++j) {
+            for (int alpha = 0; alpha < DIM; ++alpha) {
+                grad[i][alpha] +=
+                        (f[i] - f[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]]) * psijTilde_xi[i][alpha];
+            }
+        }
+    }
+}
+
+#endif
+
+void Particles::move(const double &dt, Domain &domain){
+    for(int i=0; i<N; ++i) {
+        x[i] = x[i] + vx[i] * dt;
+        y[i] = y[i] + vy[i] * dt;
+#if DIM == 3
+        z[i] = z[i] +vz[i] * dt;
+#endif
+#if PERIODIC_BOUNDARIES
+        if (x[i] <= domain.bounds.minX) {
+            x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
+        } else if (domain.bounds.maxX < x[i]) {
+            x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
+        }
+        if (y[i] <= domain.bounds.minY) {
+            y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
+        } else if (domain.bounds.maxY < y[i]) {
+            y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
+        }
+#if DIM ==3
+        if (z[i] <= domain.bounds.minZ) {
+            z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
+        } else if (domain.bounds.maxZ < z[i]) {
+            z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
+        }
+#endif
+#endif
+    }
+}
 
 void Particles::dump2file(std::string filename){
     // open output file
