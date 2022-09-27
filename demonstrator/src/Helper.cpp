@@ -16,3 +16,11 @@ void Helper::inverseMatrix(double *A, int N){
     //delete[] IPIV;
     //delete[] WORK;
 }
+
+double Helper::dotProduct(double *a, double *b){
+    double res = 0.;
+    for (int alpha=0; alpha<DIM; ++alpha){
+        res += a[alpha] * b[alpha];
+    }
+    return res;
+}

@@ -36,6 +36,9 @@ public:
     void compPsijTilde(Helper &helper, const double &kernelSize);
     void gradient(double *f, double (*grad)[DIM]);
     void compPressure(const double &gamma);
+    void compEffectiveFace();
+    void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma);
+
 
 #if PERIODIC_BOUNDARIES
     void createGhostParticles(Domain &domain,
@@ -43,7 +46,16 @@ public:
     void ghostNNS(Domain &domain, const Particles &ghostParticles, const double &kernelSize);
     void compDensity(const Particles &ghostParticles, const double &kernelSize);
     void compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize);
-    void gradient(double *f, double (*grad)[DIM], const Particles &ghostParticles);
+    void gradient(double *f, double (*grad)[DIM], double *fGhost, const Particles &ghostParticles);
+    void compEffectiveFace(const Particles &ghostParticles);
+    void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma,
+                           const Particles  &ghostParticles);
+
+    /// functions to copy computed quantities to ghosts needed for further processing
+    void updateGhostState(Particles &ghostParticles);
+    void updateGhostPsijTilde(Particles &ghostParticles);
+    void updateGhostGradients(Particles &ghostParticles);
+
 #endif
 
     /// function to move particles for testing purposes
@@ -56,6 +68,8 @@ private:
     int *noi;  // number of interactions
     double *omega; // store omega to avoid recomputing
     double (*psijTilde_xi)[DIM];
+    double (*Aij)[DIM];
+    double (*WijL)[DIM+2], (*WijR)[DIM+2]; // DIM velocity components, density and pressure
     void compOmega(int i, const double &kernelSize);
     double (*kernel)(const double&, const double&){ &Kernel::cubicSpline };
 
@@ -64,6 +78,9 @@ private:
     void compOmega(int i, const Particles &ghostParticles, const double &kernelSize);
     int *nnlGhosts;
     int *noiGhosts;
+    double (*AijGhosts)[DIM];
+    double (*WijLGhosts)[DIM+2], (*WijRGhosts)[DIM+2]; // DIM velocity components, density and pressure
+    int *ghostMap;
 #endif
 
     /// Helper variables for gradient estimation

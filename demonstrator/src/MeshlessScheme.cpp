@@ -62,14 +62,18 @@ void MeshlessScheme::run(){
 
         Logger(INFO) << "    > Computing gradients";
 #if PERIODIC_BOUNDARIES
+        particles->updateGhostState(ghostParticles);
         particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
-        particles->gradient(particles->rho, particles->rhoGrad, ghostParticles);
-        particles->gradient(particles->vx, particles->vxGrad, ghostParticles);
-        particles->gradient(particles->vy, particles->vyGrad, ghostParticles);
+        particles->updateGhostPsijTilde(ghostParticles);
+        particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
+        particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
+        particles->gradient(particles->vy, particles->vyGrad, ghostParticles.vy, ghostParticles);
 #if DIM == 3
-        particles->gradient(particles->vz, particles->vzGrad, ghostParticles);
+        particles->gradient(particles->vz, particles->vzGrad, ghostParticles.vz, ghostParticles);
 #endif
-        particles->gradient(particles->P, particles->PGrad, ghostParticles);
+        particles->gradient(particles->P, particles->PGrad, ghostParticles.P, ghostParticles);
+        Logger(DEBUG) << "      > Update ghosts";
+        particles->updateGhostGradients(ghostParticles);
 #else
         particles->compPsijTilde(helper, config.kernelSize);
         particles->gradient(particles->rho, particles->rhoGrad);
@@ -80,6 +84,15 @@ void MeshlessScheme::run(){
 #endif
         particles->gradient(particles->P, particles->PGrad);
 #endif
+        Logger(INFO) << "    > Preparing Riemann solver";
+        Logger(DEBUG) << "      > Computing effective faces";
+        particles->compEffectiveFace();
+#if PERIODIC_BOUNDARIES
+        particles->compEffectiveFace(ghostParticles);
+#endif
+        Logger(DEBUG) << "      > Computing fluxes";
+        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
+
         Logger(INFO) << "    > Dump particles to file";
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 

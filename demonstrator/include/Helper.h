@@ -21,6 +21,7 @@ class Helper {
 
 public:
     void inverseMatrix(double *A, int N);
+    static double dotProduct(double *a, double*b);
 
 private:
     double WORK[DIM*DIM];
