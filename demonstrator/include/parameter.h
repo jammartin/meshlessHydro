@@ -18,4 +18,10 @@
 **/
 #define MAX_NUM_GHOST_INTERACTIONS 750
 
+/// define verbosity for each VERBOSITY_PARTICLES particles
+#define VERBOSITY_PARTICLES 10
+
+/// slope limiting parameter
+#define BETA 1.
+
 #endif //DEMONSTRATOR_PARAMETER_H

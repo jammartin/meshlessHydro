@@ -72,7 +72,12 @@ void MeshlessScheme::run(){
         particles->gradient(particles->vz, particles->vzGrad, ghostParticles.vz, ghostParticles);
 #endif
         particles->gradient(particles->P, particles->PGrad, ghostParticles.P, ghostParticles);
-        Logger(DEBUG) << "      > Update ghosts";
+        Logger(DEBUG) << "      > Update ghost gradients";
+        particles->updateGhostGradients(ghostParticles);
+        // TODO: check how to properly limit gradiens
+        Logger(DEBUG) << "      > Limiting slopes";
+        particles->slopeLimiter(config.kernelSize, &ghostParticles);
+        Logger(DEBUG) << "      > Update limited ghost gradients";
         particles->updateGhostGradients(ghostParticles);
 #else
         particles->compPsijTilde(helper, config.kernelSize);
@@ -83,6 +88,9 @@ void MeshlessScheme::run(){
         particles->gradient(particles->vz, particles->vzGrad);
 #endif
         particles->gradient(particles->P, particles->PGrad);
+        // TODO: check how to properly limit gradiens
+        Logger(DEBUG) << "      > Limiting slopes";
+        particles->slopeLimiter(config.kernelSize);
 #endif
         Logger(INFO) << "    > Preparing Riemann solver";
         Logger(DEBUG) << "      > Computing effective faces";
@@ -93,8 +101,24 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      > Computing fluxes";
         particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
 
+#if PERIODIC_BOUNDARIES
+        Logger(DEBUG) << "      > Computing ghost fluxes";
+        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
+                                     ghostParticles);
+#endif
+        Logger(INFO) << "    > Solving Riemann problems";
+        //TODO: continue here with implementation after gradient check
+        particles->solveRiemannProblems(config.gamma);
+
+#if PERIODIC_BOUNDARIES
+        particles->solveRiemannProblems(ghostParticles);
+#endif
+
         Logger(INFO) << "    > Dump particles to file";
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+
+        //Logger(ERROR) << "Aborting for debugging.";
+        //exit(6);
 
         Logger(INFO) << "    > Moving particles";
         particles->move(config.timeStep, domain);

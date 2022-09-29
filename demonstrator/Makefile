@@ -75,7 +75,7 @@ $(HOLIB):
 $(DEPDIR)/%.$(DEPEXT): $(SRCDIR)/%.$(SRCEXT) | $(DEPDIR)
 	@echo "Generating dependency file '$@' ..."
 	@$(CXX) -MM $(CXXFLAGS) $< -MF $@
-	@$(SED) 's,$(*F).$(OBJEXT),$*.$(OBJEXT) $@,' $@
+	@$(SED) 's,$(*F)\.$(OBJEXT),$*\.$(OBJEXT) $@,' $@
 	@rm -f $@~
 	@echo "... done."
 

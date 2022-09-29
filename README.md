@@ -16,13 +16,7 @@ where $\tilde{\psi}_j^\alpha\left( \vec{x}_i \right)$ is somewhat complex helper
 
 ### Riemann Solver
 
- 
- 
-
-
-
-
-
+An exact Riemann solver taken from [this repository](https://github.com/bwvdnbro/python_finite_volume_solver) is used to solve the Riemann problem at the effective faces.
 
 
 ## Resources
@@ -34,32 +28,42 @@ where $\tilde{\psi}_j^\alpha\left( \vec{x}_i \right)$ is somewhat complex helper
 ### File tree
 ```
 ├── LICENSE
-├── README.md
-├── demonstrator 
+├── README.md (this file)
+├── demonstrator
 │   ├── Makefile
+│   ├── config.info
 │   ├── include
 │   │   ├── ConfigParser.h
-│   │   ├── H5Profiler.h
+│   │   ├── Domain.h
+│   │   ├── Helper.h
 │   │   ├── InitialDistribution.h
 │   │   ├── Logger.h
+│   │   ├── MeshlessScheme.h
 │   │   ├── Particles.h
-│   │   └── global.h
+│   │   ├── Riemann.h
+│   │   └── parameter.h
 │   └── src
 │       ├── ConfigParser.cpp
-│       ├── H5Profiler.cpp
+│       ├── Domain.cpp
+│       ├── Helper.cpp
 │       ├── InitialDistribution.cpp
+│       ├── Logger.cpp
+│       ├── MeshlessScheme.cpp
 │       ├── Particles.cpp
+│       ├── Riemann.cpp
 │       └── main.cpp
-├── media 
+├── media
 │   └── volumePartition.png
 ├── snippets
 │   └── volumePartition
 │       └── volumePartition.py
 └── testcases
     ├── kelvin-helmholtz
+    │   ├── densityPlotter.py
     │   └── generateIC.py
     └── sedov
-        └── initial_sedov.py
+        ├── initial_sedov.py
+        └── sedov_N61.h5
 ```
 ### Directories
 

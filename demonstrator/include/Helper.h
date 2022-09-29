@@ -23,9 +23,21 @@ public:
     void inverseMatrix(double *A, int N);
     static double dotProduct(double *a, double*b);
 
+
+    /**
+     * good resource for 3D implementation: https://math.stackexchange.com/a/897677
+     *
+     * @param[in] a normed vector to be aligned with b
+     * @param[in] b normed vector to which a shall be rotated by the matrix
+     * @param[out] Lambda rotation matrix, must be pre-allocated [DIM*DIM]
+     *             indexed lambda_ij = Lambda[i+DIM*j], DIM=2
+     */
+    static void rotationMatrix2D(double *a, double *b, double *Lambda);
+
 private:
     double WORK[DIM*DIM];
     int IPIV[DIM];
+
 };
 
 #endif //MESHLESSHYDRO_HELPER_H
