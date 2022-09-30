@@ -40,9 +40,9 @@ Riemann::Riemann(double *WR, double *WL, double *Aij) : WR { WR }, WL { WL }, Ai
 void Riemann::exact(double *Fij, const double &gamma){
     RiemannSolver solver { gamma };
 
-    //Logger(DEBUG) << "rhoL = " << WL[0] << ", rhoR = " << WR[0]
-    //              << ", uL = " << WL[2] << ", uR = " << WR[2]
-    //              << ", PL = " << WL[1] << ", PR = " << WR[1];
+    Logger(DEBUG) << "rhoL = " << WL[0] << ", rhoR = " << WR[0]
+                  << ", uL = " << WL[2] << ", uR = " << WR[2]
+                  << ", PL = " << WL[1] << ", PR = " << WR[1];
 
     solver.solve(WL[0], WL[2], WL[1], WR[0], WR[2], WR[1],
                  Fij[0], Fij[2], Fij[1]);

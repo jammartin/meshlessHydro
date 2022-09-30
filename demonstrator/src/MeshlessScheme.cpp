@@ -19,7 +19,7 @@ double Kernel::cubicSpline(const double &r, const double &h) {
 
 MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
                                Domain::Cell bounds) : config { config }, particles { particles },
-                                                      domain(bounds), ghostParticles(particles->N/(DIM*2)){
+                                                      domain(bounds), ghostParticles(particles->N/DIM){
 
     Logger(INFO) << "    > Creating grid ... ";
     domain.createGrid(config.kernelSize);
@@ -108,17 +108,17 @@ void MeshlessScheme::run(){
 #endif
         Logger(INFO) << "    > Solving Riemann problems";
         //TODO: continue here with implementation after gradient check
-        particles->solveRiemannProblems(config.gamma);
+        //particles->solveRiemannProblems(config.gamma);
 
 #if PERIODIC_BOUNDARIES
-        particles->solveRiemannProblems(ghostParticles);
+        //particles->solveRiemannProblems(ghostParticles);
 #endif
 
         Logger(INFO) << "    > Dump particles to file";
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 
-        //Logger(ERROR) << "Aborting for debugging.";
-        //exit(6);
+        Logger(ERROR) << "Aborting for debugging.";
+        exit(6);
 
         Logger(INFO) << "    > Moving particles";
         particles->move(config.timeStep, domain);

@@ -218,7 +218,6 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                psijTilde_xi[i][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
                     psijTilde_xi[i][alpha] += B[DIM * alpha + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
@@ -235,7 +234,8 @@ void Particles::gradient(double *f, double (*grad)[DIM]){
 
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i]) * psijTilde_xi[i][alpha];
+                grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
+                                  * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
             }
         }
     }
@@ -338,12 +338,12 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         double alphaMax = abs((psiMaxNgb - f[i]) / (psiMaxMid - f[i]));
         double alphaMin = abs((f[i] - psiMinNgb) / (f[i] - psiMinMid));
 
-        if(i==4){
+        /*if(i==4){
             Logger(DEBUG) << "alphaMin = " << alphaMin << ", alphaMax = " << alphaMax
                         << ", psiMinNgb = " << psiMinNgb << ", psiMaxNgb = " << psiMaxNgb
                         << ", psiMinNgb = " << psiMinMid << ", psiMaxNgb = " << psiMaxMid
                         << ", f[i] = " << f[i];
-        }
+        }*/
 
         if (alphaMin <= alphaMax && BETA*alphaMin < 1.){
             //Logger(DEBUG) << "        > Limiting gradient @" << i << ", alpha = "
@@ -414,7 +414,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijR[iW][4] = vz[i] - vFrame[2];
             WijL[iW][4] = vz[j] - vFrame[2];
 #endif
-            if(i==4){
+            /*if(i==4){
                 Logger(DEBUG) << "vFrame[0] = " << vFrame[0]
                             << ", vFrame[1] = " << vFrame[1]
                             << ", rhoGrad[i][0] = " << rhoGrad[i][0]
@@ -424,7 +424,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
                             << ", xij = " << xij[0] << ", " << xij[1]
                             << ", xj = " << x[j] << ", " << x[j] << " @" << j;
                 //exit(5);
-            }
+            }*/
             // reconstruction at effective face
             WijR[iW][0] += Helper::dotProduct(rhoGrad[i], xijxi);
             WijL[iW][0] += Helper::dotProduct(rhoGrad[j], xijxj);
@@ -483,31 +483,60 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
                                      const double &kernelSize){
     int iGhost = 0;
     for(int i=0; i<N; ++i) {
-        bool foundGhost = false;
+        bool foundGhostX = false, foundGhostY = false;
         ghostMap[i] = -1;
 
+        // x-direction
         if (x[i] < domain.bounds.minX + kernelSize) {
             ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
-            foundGhost = true;
+            foundGhostX = true;
         } else if (domain.bounds.maxX - kernelSize <= x[i]) {
             ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
-            foundGhost = true;
+            foundGhostX = true;
         } else {
             ghostParticles.x[iGhost] = x[i];
         }
+
+        // y-direction
         if (y[i] < domain.bounds.minY + kernelSize) {
             ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
-            foundGhost = true;
+            foundGhostY = true;
         } else if (domain.bounds.maxY - kernelSize <= y[i]) {
             ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
-            foundGhost = true;
+            foundGhostY = true;
         } else {
             ghostParticles.y[iGhost] = y[i];
         }
-        if (foundGhost){
+
+        // 'corner' particle first if both are true
+        if (foundGhostX || foundGhostY) {
             ghostMap[i] = iGhost;
             ++iGhost;
         }
+
+        // create DIM extra normal particles
+        if (foundGhostX && foundGhostY){
+            ghostParticles.x[iGhost] = x[i];
+            if (y[i] < domain.bounds.minY + kernelSize) {
+                ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
+            } else if (domain.bounds.maxY - kernelSize <= y[i]) {
+                ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
+            }
+            ghostMap[i] = iGhost;
+            ++iGhost;
+            if (x[i] < domain.bounds.minX + kernelSize) {
+                ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
+            } else if (domain.bounds.maxX - kernelSize <= x[i]) {
+                ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
+            }
+            ghostParticles.y[iGhost] = y[i];
+            ghostMap[i] = iGhost;
+            ++iGhost;
+        }
+
+        foundGhostX = false;
+        foundGhostY = false;
+
 #if DIM == 3
         Logger(ERROR) << "Ghost cells not implemented for 3D simulations. - Aborting.";
         exit(2);
@@ -657,20 +686,25 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize)/omega[i];
 
-            xj[0] = ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
-            xj[1] = ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+            xjGhost[0] = ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+            xjGhost[1] = ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
 #if DIM==3
             xj[2] = ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
 #endif
 
             for (int alpha=0; alpha<DIM; ++alpha){
                 for(int beta=0; beta<DIM; ++beta){
-                    B[DIM*alpha+beta] += (xj[alpha] - xi[alpha])*(xj[beta] - xi[beta]) * psij_xi;
+                    B[DIM*alpha+beta] += (xjGhost[alpha] - xi[alpha])*(xjGhost[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
 
+        //Logger(DEBUG) << "E = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
+
         helper.inverseMatrix(B, DIM);
+
+        //Logger(DEBUG) << "B = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
+        //exit(7);
 
         for (int j=0; j<noi[i]; ++j) {
 
@@ -683,7 +717,6 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                psijTilde_xi[i][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
                     psijTilde_xi[i][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
@@ -702,7 +735,7 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[i][alpha] += B[alpha * DIM + beta ] * (xj[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xi[i][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
@@ -717,14 +750,15 @@ void Particles::gradient(double *f, double (*grad)[DIM], double *fGhost, const P
 
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i]) * psijTilde_xi[i][alpha];
+                grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
+                                  * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
             }
         }
 
         for (int j = 0; j < noiGhosts[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                grad[i][alpha] +=
-                        (fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] - f[i]) * psijTilde_xi[i][alpha];
+                grad[i][alpha] += (fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] - f[i])
+                                  * ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
             }
         }
     }
@@ -780,7 +814,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             vFrame[2] = vz[i] + (ghostParticles.vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 
-            if(i==4){
+            /*if(i==4){
                 Logger(DEBUG) << "vFrame[0] = " << vFrame[0]
                               << ", vFrame[1] = " << vFrame[1]
                               << ", rhoGrad[i][0] = " << rhoGrad[i][0]
@@ -790,7 +824,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
                               << ", xij = " << xij[0] << ", " << xij[1]
                               << ", xj = " << ghostParticles.x[j] << ", " << ghostParticles.y[j] << " @" << j;
                 exit(5);
-            }
+            }*/
 
             int iW = i*MAX_NUM_GHOST_INTERACTIONS+jn;
             // boost frame to effective face
@@ -892,28 +926,37 @@ void Particles::dump2file(std::string filename){
     // create datasets
     HighFive::DataSet rhoDataSet = h5File.createDataSet<double>("/rho", HighFive::DataSpace(N));
     HighFive::DataSet posDataSet = h5File.createDataSet<double>("/x", HighFive::DataSpace(dataSpaceDims));
-    //HighFive::DataSet rhoGradDataSet = h5File.createDataSet<double>("/rhoGrad", HighFive::DataSpace(dataSpaceDims));
+    HighFive::DataSet rhoGradDataSet = h5File.createDataSet<double>("/rhoGrad", HighFive::DataSpace(dataSpaceDims));
 
     // containers for particle data
     std::vector<double> rhoVec(rho, rho+N);
     std::vector<std::vector<double>> posVec(N);
-    //std::vector<std::vector<double>> rhoGradVec(N);
+    std::vector<std::vector<double>> rhoGradVec(N);
 
     // fill containers with data
     std::vector<double> posBuf(DIM);
+    std::vector<double> rhoGradBuf(DIM);
     for(int i=0; i<N; ++i){
         //Logger(DEBUG) << "      > Dumping particle @"  << i;
+        // position
         posBuf[0] = x[i];
         posBuf[1] = y[i];
 #if DIM == 3
         posBuf[2] = z[i];
 #endif
         posVec[i] = posBuf;
-    }
 
+        // density gradient
+        rhoGradBuf[0] = rhoGrad[i][0];
+        rhoGradBuf[1] = rhoGrad[i][1];
+#if DIM == 3
+        rhoGradBuf[2] = rhoGrad[i][2];
+#endif
+        rhoGradVec[i] = rhoGradBuf;
+    }
     // write data
     rhoDataSet.write(rhoVec);
     posDataSet.write(posVec);
-    //rhoGradDataSet.write(rhoGradVec);
+    rhoGradDataSet.write(rhoGradVec);
 }
 

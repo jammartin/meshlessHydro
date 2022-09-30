@@ -55,25 +55,42 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description="Create an initial condition HDF5 file for a 2D Kelvin-Helmholtz test case.")
     parser.add_argument("--numParticles", "-N", metavar="int", type=int, help="number of particles", required=True)
+    parser.add_argument("--regularGrid", "-g", action="store_true")
     
     args = parser.parse_args()
 
     N = args.numParticles
-
-    # initialize default random generator
-    rng = np.random.default_rng(6102003)
     
     outH5 = h5.File("khN{}.h5".format(N), "w")
     print("Generating Kelvin-Helmholtz initial conditions with", N, "particles ...")
 
-    # randomly generate N points in DIM dimensions
-    pos = rng.random(size=(N, DIM))
+    if (args.regularGrid):
+        print("Generating particle positions on a regular grid in box")
+        pos = np.empty((N, DIM))
+        xv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=False)
+        yv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=False)
+        i = 0
+        for x in xv:
+            for y in yv:
+                pos[i,0] = x
+                pos[i,1] = y
+                #print("Particle i =", i, "[", x, ",", y, "]")
+                i += 1
+                
+    else:
+        print("Generating random particle positions in box")
+        # initialize default random generator
+        rng = np.random.default_rng(6102003)
+        # randomly generate N points in DIM dimensions
+        pos = rng.random(size=(N, DIM))
+
     # set velocities
     vel = np.empty(pos.shape)
     vel[:,0] = getVelsX(pos[:,1])
     vel[:,1] = getVelsY(pos[:,0])
     # set densities
-    rho = getDensities(pos[:,1])
+    #rho = getDensities(pos[:,1])
+    rho = np.ones(pos.shape[0])
     # create material ID
     matId = np.zeros(len(rho), dtype=np.int8)
     # volume is 1

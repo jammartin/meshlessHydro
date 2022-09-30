@@ -114,6 +114,7 @@ private:
     double B[DIM*DIM];
     double xi[DIM];
     double xj[DIM];
+    double xjGhost[DIM];
 };
 
 

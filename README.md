@@ -72,7 +72,12 @@ An exact Riemann solver taken from [this repository](https://github.com/bwvdnbro
 - `snippets` is for miscellaneous scripts to fool around 
 - `testcases` includes subdirectories with standard test cases to validate the code
 
+## Demonstrator 
 
+The C++ program in the folder demonstrator can be build with the given `Makefile`. To install the necessary header-only libraries you can run the command `make install`.
+The following prerequisites mus be installed manually:
+
+- 
 
 ## Visualization
 
