@@ -59,14 +59,14 @@ public:
     void ghostNNS(Domain &domain, const Particles &ghostParticles, const double &kernelSize);
     void compDensity(const Particles &ghostParticles, const double &kernelSize);
     void compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize);
-    void gradient(double *f, double (*grad)[DIM], double *fGhost, const Particles &ghostParticles);
+    void gradient(double *f, double (*grad)[DIM], double *fGhost, const Particles &ghostParticles); //TODO: remove ghostParticles argument
     void compEffectiveFace(const Particles &ghostParticles);
     void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma,
                            const Particles &ghostParticles);
 
     /// functions to copy computed quantities to ghosts needed for further processing
     void updateGhostState(Particles &ghostParticles);
-    void updateGhostPsijTilde(Particles &ghostParticles);
+    void updateGhostPsijTilde(Particles &ghostParticles); //TODO: remove
     void updateGhostGradients(Particles &ghostParticles);
 
     void solveRiemannProblems(const Particles &ghostParticles);
@@ -81,13 +81,16 @@ public:
     /// function to move particles for testing purposes
     void move(const double &dt, Domain &domain);
 
+    /// sanity check functions
+    double sumVolume();
+
     void dump2file(std::string filename);
 
 private:
     int *nnl; // nearest neighbor list
     int *noi;  // number of interactions
     double *omega; // store omega to avoid recomputing
-    double (*psijTilde_xi)[DIM];
+    double (*psijTilde_xi)[DIM]; // TODO: remove this buffer
     double (*Aij)[DIM];
     double (*WijL)[DIM+2], (*WijR)[DIM+2]; // DIM velocity components, density and pressure
     double (*Fij)[DIM+2];
@@ -104,6 +107,7 @@ private:
     void compOmega(int i, const Particles &ghostParticles, const double &kernelSize);
     int *nnlGhosts;
     int *noiGhosts;
+    //double (*psijTilde_xiGhosts)[DIM]; // TODO: remove this buffer
     double (*AijGhosts)[DIM];
     double (*WijLGhosts)[DIM+2], (*WijRGhosts)[DIM+2]; // DIM velocity components, density and pressure
     double (*FijGhosts)[DIM+2];

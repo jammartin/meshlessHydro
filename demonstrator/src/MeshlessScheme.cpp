@@ -4,22 +4,14 @@
 
 #include "../include/MeshlessScheme.h"
 
-//TODO: add for 3 dimensions
-double Kernel::cubicSpline(const double &r, const double &h) {
-    const double sigma = 10./(7.*M_PI*h*h);
-    const double q = r/h;
-    if (0. <= q && q <= 1.){
-        return sigma*(1.-3./2.*q*q*(1.-q/2.));
-    } else if (1. < q && q < 2.){
-        return sigma/4.*pow(2.-q, 3.);
-    } else {
-        return 0.;
-    }
-}
 
 MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
                                Domain::Cell bounds) : config { config }, particles { particles },
-                                                      domain(bounds), ghostParticles(particles->N/DIM){
+                                                      domain(bounds)
+#if PERIODIC_BOUNDARIES
+                                                      , ghostParticles(particles->N/DIM)
+#endif
+                                                      {
 
     Logger(INFO) << "    > Creating grid ... ";
     domain.createGrid(config.kernelSize);
@@ -57,6 +49,9 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         particles->compDensity(ghostParticles, config.kernelSize);
 #endif
+
+        Logger(DEBUG) << "  SANITY CHECK > V_tot = " << particles->sumVolume();
+
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
 
@@ -64,8 +59,12 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         particles->updateGhostState(ghostParticles);
         particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
-        particles->updateGhostPsijTilde(ghostParticles);
+        //particles->updateGhostPsijTilde(ghostParticles);
         particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
+
+        Logger(ERROR) << "Aborting for debugging.";
+        exit(6);
+
         particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
         particles->gradient(particles->vy, particles->vyGrad, ghostParticles.vy, ghostParticles);
 #if DIM == 3
@@ -74,9 +73,9 @@ void MeshlessScheme::run(){
         particles->gradient(particles->P, particles->PGrad, ghostParticles.P, ghostParticles);
         Logger(DEBUG) << "      > Update ghost gradients";
         particles->updateGhostGradients(ghostParticles);
-        // TODO: check how to properly limit gradiens
+        // TODO: check how to properly limit
         Logger(DEBUG) << "      > Limiting slopes";
-        particles->slopeLimiter(config.kernelSize, &ghostParticles);
+        //particles->slopeLimiter(config.kernelSize, &ghostParticles);
         Logger(DEBUG) << "      > Update limited ghost gradients";
         particles->updateGhostGradients(ghostParticles);
 #else
@@ -90,7 +89,7 @@ void MeshlessScheme::run(){
         particles->gradient(particles->P, particles->PGrad);
         // TODO: check how to properly limit gradiens
         Logger(DEBUG) << "      > Limiting slopes";
-        particles->slopeLimiter(config.kernelSize);
+        //particles->slopeLimiter(config.kernelSize);
 #endif
         Logger(INFO) << "    > Preparing Riemann solver";
         Logger(DEBUG) << "      > Computing effective faces";
@@ -111,11 +110,16 @@ void MeshlessScheme::run(){
         //particles->solveRiemannProblems(config.gamma);
 
 #if PERIODIC_BOUNDARIES
-        //particles->solveRiemannProblems(ghostParticles);
+        particles->solveRiemannProblems(ghostParticles);
 #endif
 
         Logger(INFO) << "    > Dump particles to file";
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+
+#if PERIODIC_BOUNDARIES
+        //Logger(INFO) << "    > Dump ghosts to file";
+        //ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+#endif
 
         Logger(ERROR) << "Aborting for debugging.";
         exit(6);

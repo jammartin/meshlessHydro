@@ -4,6 +4,23 @@
 
 #include "../include/Particles.h"
 
+//TODO: add for 3 dimensions
+double Kernel::cubicSpline(const double &r, const double &h) {
+
+    // TODO: remove this
+    double h2 = h/2.;
+
+    const double sigma = 10./(7.*M_PI*h2*h2);
+    const double q = r/h2;
+    if (0. <= q && q <= 1.){
+        return sigma*(1.-3./2.*q*q*(1.-q/2.));
+    } else if (1. < q && q < 2.){
+        return sigma/4.*pow(2.-q, 3.);
+    } else {
+        return 0.;
+    }
+}
+
 Particles::Particles(int numParticles) : N { numParticles }{
     // allocate memory
     matId = new int[numParticles];
@@ -28,7 +45,7 @@ Particles::Particles(int numParticles) : N { numParticles }{
     nnl = new int[numParticles*MAX_NUM_INTERACTIONS];
     noi = new int[numParticles];
     omega = new double[numParticles];
-    psijTilde_xi = new double[numParticles][DIM];
+    psijTilde_xi = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
     Aij = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
     WijL = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
     WijR = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
@@ -37,7 +54,8 @@ Particles::Particles(int numParticles) : N { numParticles }{
     // estimated memory allocation
     nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
     noiGhosts = new int[numParticles];
-    ghostMap = new int[numParticles];
+    ghostMap = new int[numParticles*(DIM+1)]; // TODO: this is only applicable for DIM==2
+    //psijTilde_xiGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
     AijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
     WijLGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
     WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
@@ -76,6 +94,7 @@ Particles::~Particles(){
 #if PERIODIC_BOUNDARIES
     delete[] nnlGhosts;
     delete[] noiGhosts;
+    //delete[] psijTilde_xiGhosts;
     delete[] AijGhosts;
     delete[] WijLGhosts;
     delete[] WijRGhosts;
@@ -160,7 +179,7 @@ void Particles::compOmega(int i, const double &kernelSize){
         double r = sqrt(dSqr);
         omg += kernel(r, kernelSize);
     }
-    omega[i] = omg;
+    omega[i] = omg + kernel(0., kernelSize); // add self interaction to normalization factor
 }
 
 void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
@@ -172,9 +191,9 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             B[k] = 0.;
         }
 
-        for (int alpha = 0; alpha < DIM; ++alpha) {
-            psijTilde_xi[i][alpha] = 0.;
-        }
+        //for (int alpha = 0; alpha < DIM; ++alpha) {
+        //    psijTilde_xi[i][alpha] = 0.;
+        //}
 
         xi[0] = x[i];
         xi[1] = y[i];
@@ -217,9 +236,13 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
+            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+
             for (int alpha = 0; alpha < DIM; ++alpha) {
+                psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[i][alpha] += B[DIM * alpha + beta] * (xj[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] += B[DIM * alpha + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
@@ -346,16 +369,16 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         }*/
 
         if (alphaMin <= alphaMax && BETA*alphaMin < 1.){
-            //Logger(DEBUG) << "        > Limiting gradient @" << i << ", alpha = "
-            //              << alphaMin << ", grad[i][0] = " << grad[i][0] << ", grad[i][1] = " << grad[i][1];
+            Logger(DEBUG) << "        > Limiting gradient with alphaMin@" << i << ", alpha = "
+                          << alphaMin << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
             grad[i][0] *= alphaMin;
             grad[i][1] *= alphaMin;
 #if DIM==3
             grad[i][2] *= alphaMin;
 #endif
         } else if (alphaMax <= alphaMin && BETA*alphaMax < 1.){
-            //Logger(DEBUG) << "        > Limiting gradient @" << i << ", alpha = "
-            //            << alphaMax << ", grad[i][0] = " << grad[i][0] << ", grad[i][1] = " << grad[i][1];
+            Logger(DEBUG) << "        > Limiting gradient with alphaMax@" << i << ", alpha = "
+                        << alphaMax << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
             grad[i][0] *= alphaMax;
             grad[i][1] *= alphaMax;
 #if DIM==3
@@ -484,7 +507,9 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
     int iGhost = 0;
     for(int i=0; i<N; ++i) {
         bool foundGhostX = false, foundGhostY = false;
-        ghostMap[i] = -1;
+        ghostMap[i*(DIM+1)] = -1;
+        ghostMap[i*(DIM+1)+1] = -1;
+        ghostMap[i*(DIM+1)+2] = -1;
 
         // x-direction
         if (x[i] < domain.bounds.minX + kernelSize) {
@@ -510,7 +535,7 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
 
         // 'corner' particle first if both are true
         if (foundGhostX || foundGhostY) {
-            ghostMap[i] = iGhost;
+            ghostMap[i*(DIM+1)] = iGhost;
             ++iGhost;
         }
 
@@ -522,7 +547,7 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
             } else if (domain.bounds.maxY - kernelSize <= y[i]) {
                 ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             }
-            ghostMap[i] = iGhost;
+            ghostMap[i*(DIM+1)+1] = iGhost;
             ++iGhost;
             if (x[i] < domain.bounds.minX + kernelSize) {
                 ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
@@ -530,12 +555,12 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
                 ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
             }
             ghostParticles.y[iGhost] = y[i];
-            ghostMap[i] = iGhost;
+            ghostMap[i*(DIM+1)+2] = iGhost;
             ++iGhost;
         }
 
-        foundGhostX = false;
-        foundGhostY = false;
+        //foundGhostX = false;
+        //foundGhostY = false;
 
 #if DIM == 3
         Logger(ERROR) << "Ghost cells not implemented for 3D simulations. - Aborting.";
@@ -546,41 +571,41 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
 }
 
 void Particles::updateGhostState(Particles &ghostParticles){
-    for (int i=0; i<N; ++i){
+    for (int i=0; i<N*(DIM+1); ++i){
         if (ghostMap[i] >= 0){
-            ghostParticles.rho[ghostMap[i]] = rho[i];
-            ghostParticles.P[ghostMap[i]] = P[i];
-            ghostParticles.omega[ghostMap[i]] = omega[i];
-            ghostParticles.vx[ghostMap[i]] = vx[i];
-            ghostParticles.vx[ghostMap[i]] = vy[i];
+            ghostParticles.rho[ghostMap[i]] = rho[i/(DIM+1)];
+            ghostParticles.P[ghostMap[i]] = P[i/(DIM+1)];
+            ghostParticles.omega[ghostMap[i]] = omega[i/(DIM+1)];
+            ghostParticles.vx[ghostMap[i]] = vx[i/(DIM+1)];
+            ghostParticles.vx[ghostMap[i]] = vy[i/(DIM+1)];
 #if DIM==3
-            ghostParticles.vz[ghostMap[i]] = vz[i];
+            ghostParticles.vz[ghostMap[i]] = vz[i/(DIM+1)];
 #endif
         }
     }
 }
 
 void Particles::updateGhostPsijTilde(Particles &ghostParticles){
-    for (int i=0; i<N; ++i){
+    for (int i=0; i<N*(DIM+1); ++i){
         if (ghostMap[i] >= 0){
             for (int alpha=0; alpha<DIM; ++alpha){
-                ghostParticles.psijTilde_xi[ghostMap[i]][alpha] = psijTilde_xi[i][alpha];
+                ghostParticles.psijTilde_xi[ghostMap[i]][alpha] = psijTilde_xi[i/(DIM+1)][alpha];
             }
         }
     }
 }
 
 void Particles::updateGhostGradients(Particles &ghostParticles){
-    for (int i=0; i<N; ++i){
+    for (int i=0; i<N*(DIM+1); ++i){
         if (ghostMap[i] >= 0){
             for (int alpha=0; alpha<DIM; ++alpha){
-                ghostParticles.rhoGrad[ghostMap[i]][alpha] = rhoGrad[i][alpha];
-                ghostParticles.vxGrad[ghostMap[i]][alpha] = vxGrad[i][alpha];
-                ghostParticles.vyGrad[ghostMap[i]][alpha] = vyGrad[i][alpha];
+                ghostParticles.rhoGrad[ghostMap[i]][alpha] = rhoGrad[i/(DIM+1)][alpha];
+                ghostParticles.vxGrad[ghostMap[i]][alpha] = vxGrad[i/(DIM+1)][alpha];
+                ghostParticles.vyGrad[ghostMap[i]][alpha] = vyGrad[i/(DIM+1)][alpha];
 #if DIM == 3
-                ghostParticles.vzGrad[ghostMap[i]][alpha] = vzGrad[i][alpha];
+                ghostParticles.vzGrad[ghostMap[i]][alpha] = vzGrad[i/(DIM+1)][alpha];
 #endif
-                ghostParticles.PGrad[ghostMap[i]][alpha] = PGrad[i][alpha];
+                ghostParticles.PGrad[ghostMap[i]][alpha] = PGrad[i/(DIM+1)][alpha];
             }
         }
     }
@@ -643,9 +668,9 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             B[k] = 0.;
         }
 
-        for (int alpha = 0; alpha < DIM; ++alpha) {
-            psijTilde_xi[i][alpha] = 0.;
-        }
+        //for (int alpha = 0; alpha < DIM; ++alpha) {
+        //    psijTilde_xi[i][alpha] = 0.;
+        //}
 
         xi[0] = x[i];
         xi[1] = y[i];
@@ -704,6 +729,7 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
         helper.inverseMatrix(B, DIM);
 
         //Logger(DEBUG) << "B = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
+        //Logger(DEBUG) << "noi[" << i << "] = " << noi[i] << ", noiGhosts[" << i << "] = " << noiGhosts[i];
         //exit(7);
 
         for (int j=0; j<noi[i]; ++j) {
@@ -716,9 +742,13 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
+            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+
             for (int alpha = 0; alpha < DIM; ++alpha) {
+                psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[i][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
@@ -733,9 +763,13 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
+            xjGhost[0] = ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+            xjGhost[1] = ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
+
             for (int alpha = 0; alpha < DIM; ++alpha) {
+                ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[i][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
+                    ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
@@ -748,17 +782,27 @@ void Particles::gradient(double *f, double (*grad)[DIM], double *fGhost, const P
             grad[i][alpha] = 0;
         }
 
+        //Logger(DEBUG) << "      > noi[" << i << "] = " << noi[i];
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
                                   * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
+                if(i == 9522){
+                    Logger(DEBUG) << "psijTilde_xi@" << j << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha]
+                                        << ", f[j] = " << f[nnl[j + i * MAX_NUM_INTERACTIONS]] << ", f[i] = " << f[i];
+                }
             }
         }
 
+        //Logger(DEBUG) << "      > noiGhosts[" << i << "] = " << noiGhosts[i];
         for (int j = 0; j < noiGhosts[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] - f[i])
                                   * ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
+                if(i == 9522){
+                    Logger(DEBUG) << "psijTildeGhost_xi@" << j << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha]
+                                  << ", fGhost[j] = " << fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] << ", f[i] = " << f[i];
+                }
             }
         }
     }
@@ -910,6 +954,15 @@ void Particles::move(const double &dt, Domain &domain){
 #endif
 #endif
     }
+}
+
+/// Sanity check functions
+double Particles::sumVolume(){
+    double V = 0.;
+    for (int i=0; i<N; ++i){
+        V += 1./omega[i];
+    }
+    return V;
 }
 
 void Particles::dump2file(std::string filename){

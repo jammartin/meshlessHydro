@@ -89,8 +89,8 @@ if __name__=="__main__":
     vel[:,0] = getVelsX(pos[:,1])
     vel[:,1] = getVelsY(pos[:,0])
     # set densities
-    #rho = getDensities(pos[:,1])
-    rho = np.ones(pos.shape[0])
+    rho = getDensities(pos[:,1])
+    #rho = np.ones(pos.shape[0])
     # create material ID
     matId = np.zeros(len(rho), dtype=np.int8)
     # volume is 1

@@ -1,5 +1,5 @@
 ; h5 file containing the initial particle distribution
-initFile ../testcases/kelvin-helmholtz/khN100000.h5
+initFile ../testcases/kelvin-helmholtz/khN10000.h5
 
 ; output directory for particle distribution h5 files
 outDir output
@@ -24,8 +24,9 @@ periodicBoxLimits {
     upperZ 0.
 }
 
+// TODO: this is implemented as half the kernel size
 ; kernel size for meshless scheme
-kernelSize .01
+kernelSize .1
 
 ; adiabatic index
 gamma 1.6666666666666667

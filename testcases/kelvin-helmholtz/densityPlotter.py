@@ -29,7 +29,12 @@ def createPlot(h5File, outDir, plotGrad):
     #plt.show()
 
 def plotGradient(grad, pos, ax):
-    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=1000.)
+    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=.01)
+    #ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale=.01)
+    
+    for i, rhoGrad in enumerate(grad):
+        if np.linalg.norm(rhoGrad) > .05:
+            print("rhoGrad @", i, "=", rhoGrad)
     
     
 if __name__=="__main__":

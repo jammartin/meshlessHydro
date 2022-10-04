@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
     Logger(INFO) << "    > Using global kernel size h = " << config.kernelSize;
     config.gamma = confP.getVal<double>("gamma");
     Logger(INFO) << "    > Adiabatic index for ideal gas EOS gamma = " << config.gamma;
-#if PERIODIC_BOUNDARIES
+//#if PERIODIC_BOUNDARIES
     auto periodicBoxLimits = confP.getObj("periodicBoxLimits");
     config.periodicBoxLimits[0] = periodicBoxLimits.getVal<double>("lowerX");
     config.periodicBoxLimits[DIM] = periodicBoxLimits.getVal<double>("upperX");
@@ -75,9 +75,10 @@ int main(int argc, char *argv[]){
         if(i<2*DIM-1) periodicBoxStr.append(", ");
     }
     Logger(INFO) << "    > Periodic boundaries within box: " << periodicBoxStr << "]";
-#else
+//#else
     //TODO: implement dynamic/fixed box size
-#endif
+
+//#endif
 
     Logger(INFO) << "    > Reading initial distribution ...";
 
