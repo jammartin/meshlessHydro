@@ -13,8 +13,9 @@ def createPlot(h5File, outDir, plotGrad):
     pos = data["x"][:]
     rho = data["rho"][()]
     fig, ax = plt.subplots(figsize=(8,6), dpi=200)
+    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.)
     rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.)
-
+    
     # plot gradient
     if plotGrad:
         plotGradient(data["rhoGrad"][:], pos, ax);
@@ -29,12 +30,12 @@ def createPlot(h5File, outDir, plotGrad):
     #plt.show()
 
 def plotGradient(grad, pos, ax):
-    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=.01)
+    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=500.)
     #ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale=.01)
     
-    for i, rhoGrad in enumerate(grad):
-        if np.linalg.norm(rhoGrad) > .05:
-            print("rhoGrad @", i, "=", rhoGrad)
+    #for i, rhoGrad in enumerate(grad):
+    #    if np.linalg.norm(rhoGrad) > .05:
+    #        print("rhoGrad @", i, "=", rhoGrad)
     
     
 if __name__=="__main__":

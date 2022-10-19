@@ -105,13 +105,28 @@ Particles::~Particles(){
 
 void Particles::assignParticlesAndCells(Domain &domain){
     for(int i=0; i<N; ++i){
-        int iGrid = floor((x[i]-domain.bounds.minX)/domain.cellSizeX)
-                    + floor((y[i]-domain.bounds.minY)/domain.cellSizeY) * domain.cellsX
+
+        int floorX = floor((x[i]-domain.bounds.minX)/domain.cellSizeX);
+        int floorY = floor((y[i]-domain.bounds.minY)/domain.cellSizeY);
+
+        if (x[i] == domain.bounds.maxX){
+            floorX -= 1;
+        }
+        if (y[i] == domain.bounds.maxY){
+            floorY -= 1;
+        }
+
+        int iGrid = floorX + floorY * domain.cellsX
 #if DIM == 3
         + floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ) * domain.cellsX * domain.cellsY
 #endif
         ;
-        //Logger(DEBUG) << "      > Assigning particle " << i << " to cell " << iGrid;
+
+        //Logger(DEBUG) << "floor x = " << floorX
+        //          << ", floor y = " << floorY;
+
+        //Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
+        //          << "] to cell " << iGrid;
         domain.grid[iGrid].prtcls.push_back(i);
         cell[i] = iGrid; // assign cells to particles
     }
@@ -178,6 +193,11 @@ void Particles::compOmega(int i, const double &kernelSize){
 #endif
         double r = sqrt(dSqr);
         omg += kernel(r, kernelSize);
+
+        //Logger(DEBUG) << "x[" << i << "] = [" << x[i] << ", " <<  y[i] << "], x["
+        //          << nnl[j+i*MAX_NUM_INTERACTIONS] << "] = [" << x[nnl[j+i*MAX_NUM_INTERACTIONS]] << ", "
+        //          << y[nnl[j+i*MAX_NUM_INTERACTIONS]] << "]";
+
     }
     omega[i] = omg + kernel(0., kernelSize); // add self interaction to normalization factor
 }
@@ -512,10 +532,10 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         ghostMap[i*(DIM+1)+2] = -1;
 
         // x-direction
-        if (x[i] < domain.bounds.minX + kernelSize) {
+        if (x[i] < domain.bounds.minX + kernelSize && x[i] > domain.bounds.minX) {
             ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
             foundGhostX = true;
-        } else if (domain.bounds.maxX - kernelSize <= x[i]) {
+        } else if (domain.bounds.maxX - kernelSize < x[i] && x[i] < domain.bounds.maxX) {
             ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
             foundGhostX = true;
         } else {
@@ -523,10 +543,10 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         }
 
         // y-direction
-        if (y[i] < domain.bounds.minY + kernelSize) {
+        if (y[i] < domain.bounds.minY + kernelSize && y[i] > domain.bounds.minY) {
             ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
             foundGhostY = true;
-        } else if (domain.bounds.maxY - kernelSize <= y[i]) {
+        } else if (domain.bounds.maxY - kernelSize < y[i] && y[i] < domain.bounds.maxY) {
             ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             foundGhostY = true;
         } else {
@@ -536,26 +556,35 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         // 'corner' particle first if both are true
         if (foundGhostX || foundGhostY) {
             ghostMap[i*(DIM+1)] = iGhost;
+            //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
+            //          << "ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
+            //          << ghostParticles.y[iGhost] << "]";
             ++iGhost;
         }
 
         // create DIM extra normal particles
         if (foundGhostX && foundGhostY){
             ghostParticles.x[iGhost] = x[i];
-            if (y[i] < domain.bounds.minY + kernelSize) {
+            if (y[i] < domain.bounds.minY + kernelSize && y[i] > domain.bounds.minY) {
                 ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
-            } else if (domain.bounds.maxY - kernelSize <= y[i]) {
+            } else if (domain.bounds.maxY - kernelSize < y[i] && y[i] < domain.bounds.maxY) {
                 ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             }
             ghostMap[i*(DIM+1)+1] = iGhost;
+            //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
+            //              <<"ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
+            //              << ghostParticles.y[iGhost] << "]";
             ++iGhost;
-            if (x[i] < domain.bounds.minX + kernelSize) {
+            if (x[i] < domain.bounds.minX + kernelSize && x[i] > domain.bounds.minX) {
                 ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
-            } else if (domain.bounds.maxX - kernelSize <= x[i]) {
+            } else if (domain.bounds.maxX - kernelSize < x[i] && x[i] < domain.bounds.maxX) {
                 ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
             }
             ghostParticles.y[iGhost] = y[i];
             ghostMap[i*(DIM+1)+2] = iGhost;
+            //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
+            //              << "ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
+            //              << ghostParticles.y[iGhost] << "]";
             ++iGhost;
         }
 
@@ -656,8 +685,13 @@ void Particles::compOmega(int i, const Particles &ghostParticles, const double &
 #endif
         double r = sqrt(dSqr);
         omg += kernel(r, kernelSize);
+
+        //Logger(DEBUG) << "x[" << i << "] = [" << x[i] << ", " <<  y[i] << "], x["
+        //              << nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS] << "] = [" << ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]] << ", "
+        //              << ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]] << "]";
     }
     omega[i] = omg;
+    //Logger(DEBUG) << "V[" << i << "] = " << 1./omega[i] << ", noi = " << noi[i] + noiGhosts[i];
 }
 
 void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize){
@@ -678,6 +712,9 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
         xi[2] = z[i];
 #endif
 
+        //Logger(DEBUG) << "In compPsijTilde(): noi[" << i << "] = " << noi[i]
+        //        << ", noiGhosts[" << i << "] = " << noiGhosts[i];
+
         for (int j=0; j<noi[i]; ++j){
 
             double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
@@ -693,6 +730,11 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
 #if DIM==3
             xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
 #endif
+
+            //if (i == 7){
+            //    Logger(DEBUG) << "psij_xi = " << psij_xi << ", xj = [" << xj[0] << ", " << xj[1] << "]"
+            //                  << "; xi = [" << xi[0] << ", " << xi[1] << "]";
+            //}
 
             for (int alpha=0; alpha<DIM; ++alpha){
                 for(int beta=0; beta<DIM; ++beta){
@@ -716,6 +758,10 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
 #if DIM==3
             xj[2] = ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
 #endif
+            //if (i == 7){
+            //    Logger(DEBUG) << "psij_xi = " << psij_xi << ", xjGhost = [" << xjGhost[0] << ", " << xjGhost[1] << "]"
+            //                << "; xi = [" << xi[0] << ", " << xi[1] << "]";
+            //}
 
             for (int alpha=0; alpha<DIM; ++alpha){
                 for(int beta=0; beta<DIM; ++beta){
@@ -726,9 +772,30 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
 
         //Logger(DEBUG) << "E = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
 
+        // needed for sanity check of matrix E
+        double normE = 0;
+        for (int alpha=0; alpha<DIM; ++alpha){
+            for (int beta=0; beta<DIM; ++beta){
+                normE += B[alpha*DIM+beta]*B[alpha*DIM+beta];
+            }
+        }
+
         helper.inverseMatrix(B, DIM);
 
-        //Logger(DEBUG) << "B = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
+        double normB = 0;
+        for (int alpha=0; alpha<DIM; ++alpha){
+            for (int beta=0; beta<DIM; ++beta){
+                normB += B[alpha*DIM+beta]*B[alpha*DIM+beta];
+            }
+        }
+
+        // Check whether Matrix E is ill-conditioned
+        double Ncond = 1./DIM * sqrt(normE*normB);
+        //Logger(DEBUG) << "Ncond@" << i << " = " << Ncond;
+
+        //if (i == 7) {
+        //    Logger(DEBUG) << "B = " << "[" << B[0] << ", " << B[1] << ", " << B[2] << ", " << B[3] << "]";
+        //}
         //Logger(DEBUG) << "noi[" << i << "] = " << noi[i] << ", noiGhosts[" << i << "] = " << noiGhosts[i];
         //exit(7);
 
@@ -750,6 +817,10 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
                 for (int beta = 0; beta < DIM; ++beta) {
                     psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
+                //if(i == 7){
+                //    Logger(DEBUG) << "psijTilde_xi@" << j << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
+                //                  //<< ", f[j] = " << f[nnl[j + i * MAX_NUM_INTERACTIONS]] << ", f[i] = " << f[i];
+                //}
             }
         }
 
@@ -771,6 +842,10 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
                 for (int beta = 0; beta < DIM; ++beta) {
                     ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
                 }
+                //if(i == 7){
+                //    Logger(DEBUG) << "psijTildeGhost_xi@" << j << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
+                //                  //<< ", fGhost[j] = " << fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] << ", f[i] = " << f[i];
+                //}
             }
         }
     }
@@ -782,27 +857,20 @@ void Particles::gradient(double *f, double (*grad)[DIM], double *fGhost, const P
             grad[i][alpha] = 0;
         }
 
-        //Logger(DEBUG) << "      > noi[" << i << "] = " << noi[i];
+        //Logger(DEBUG) << "      > noi[" << i << "] = " << noi[i]
+        //              << ", noiGhosts[" << i << "] = " << noiGhosts[i];
+
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
                                   * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
-                if(i == 9522){
-                    Logger(DEBUG) << "psijTilde_xi@" << j << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha]
-                                        << ", f[j] = " << f[nnl[j + i * MAX_NUM_INTERACTIONS]] << ", f[i] = " << f[i];
-                }
             }
         }
 
-        //Logger(DEBUG) << "      > noiGhosts[" << i << "] = " << noiGhosts[i];
         for (int j = 0; j < noiGhosts[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] - f[i])
                                   * ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
-                if(i == 9522){
-                    Logger(DEBUG) << "psijTildeGhost_xi@" << j << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha]
-                                  << ", fGhost[j] = " << fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] << ", f[i] = " << f[i];
-                }
             }
         }
     }
@@ -935,18 +1003,18 @@ void Particles::move(const double &dt, Domain &domain){
         z[i] = z[i] +vz[i] * dt;
 #endif
 #if PERIODIC_BOUNDARIES
-        if (x[i] <= domain.bounds.minX) {
+        if (x[i] < domain.bounds.minX) {
             x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
         } else if (domain.bounds.maxX < x[i]) {
             x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
         }
-        if (y[i] <= domain.bounds.minY) {
+        if (y[i] < domain.bounds.minY) {
             y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
         } else if (domain.bounds.maxY < y[i]) {
             y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
         }
 #if DIM ==3
-        if (z[i] <= domain.bounds.minZ) {
+        if (z[i] < domain.bounds.minZ) {
             z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
         } else if (domain.bounds.maxZ < z[i]) {
             z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);

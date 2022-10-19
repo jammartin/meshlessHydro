@@ -9,7 +9,7 @@ MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
                                Domain::Cell bounds) : config { config }, particles { particles },
                                                       domain(bounds)
 #if PERIODIC_BOUNDARIES
-                                                      , ghostParticles(particles->N/DIM)
+                                                      , ghostParticles(DIM*particles->N) // TODO: memory optimization
 #endif
                                                       {
 
@@ -62,8 +62,8 @@ void MeshlessScheme::run(){
         //particles->updateGhostPsijTilde(ghostParticles);
         particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
 
-        Logger(ERROR) << "Aborting for debugging.";
-        exit(6);
+        //Logger(ERROR) << "Aborting for debugging.";
+        //exit(6);
 
         particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
         particles->gradient(particles->vy, particles->vyGrad, ghostParticles.vy, ghostParticles);
@@ -117,12 +117,12 @@ void MeshlessScheme::run(){
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 
 #if PERIODIC_BOUNDARIES
-        //Logger(INFO) << "    > Dump ghosts to file";
-        //ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+        Logger(INFO) << "    > Dump ghosts to file";
+        ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
 #endif
 
-        Logger(ERROR) << "Aborting for debugging.";
-        exit(6);
+        //Logger(ERROR) << "Aborting for debugging.";
+        //exit(6);
 
         Logger(INFO) << "    > Moving particles";
         particles->move(config.timeStep, domain);

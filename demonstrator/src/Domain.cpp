@@ -7,8 +7,8 @@
 Domain::Domain(Cell bounds) : bounds { bounds }{}
 
 void Domain::createGrid(const double &kernelSize){
-    cellsX = ceil((bounds.maxX - bounds.minX)/kernelSize);
-    cellsY = ceil((bounds.maxY - bounds.minY)/kernelSize);
+    cellsX = floor((bounds.maxX - bounds.minX)/kernelSize);
+    cellsY = floor((bounds.maxY - bounds.minY)/kernelSize);
 #if DIM == 3
     cellsZ = ceil((bounds.maxZ - bounds.minZ)/kernelSize);
 #endif
@@ -21,8 +21,8 @@ void Domain::createGrid(const double &kernelSize){
 
     cellSizeX = (bounds.maxX - bounds.minX)/(double)cellsX;
     cellSizeY = (bounds.maxY - bounds.minY)/(double)cellsY;
-    Logger(DEBUG) << "      > cellSizeX = " << cellSizeX;
-    Logger(DEBUG) << "      > cellSizeY = " << cellSizeY;
+    Logger(DEBUG) << "      > cellSizeX = " << cellSizeX << ", cellsX = " << cellsX;
+    Logger(DEBUG) << "      > cellSizeY = " << cellSizeY<< ", cellsY = " << cellsY;
 #if DIM == 3
     cellSizeZ = (domain.bounds.maxZ - domain.bounds.minZ)/(double)cellsZ;
     Logger(DEBUG) << "      > cellSizeZ = " << cellSizeZ;
