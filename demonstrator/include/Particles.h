@@ -75,6 +75,8 @@ public:
     void collectVelocityFluxes(const Particles &ghostParticles);
     void collectEnergyFluxes(const Particles &ghostParticles);
 
+    void dumpNNL(std::string filename, const Particles &ghostParticles);
+
 
 #endif
 

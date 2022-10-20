@@ -67,8 +67,8 @@ if __name__=="__main__":
     if (args.regularGrid):
         print("Generating particle positions on a regular grid in box")
         pos = np.empty((N, DIM))
-        xv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=True)
-        yv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=True)
+        xv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=False)
+        yv = np.linspace(0., 1., int(np.sqrt(N)), endpoint=False)
         i = 0
         for x in xv:
             for y in yv:

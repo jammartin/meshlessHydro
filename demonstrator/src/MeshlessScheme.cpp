@@ -74,10 +74,10 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      > Update ghost gradients";
         particles->updateGhostGradients(ghostParticles);
         // TODO: check how to properly limit
-        Logger(DEBUG) << "      > Limiting slopes";
+        //Logger(DEBUG) << "      > Limiting slopes";
         //particles->slopeLimiter(config.kernelSize, &ghostParticles);
-        Logger(DEBUG) << "      > Update limited ghost gradients";
-        particles->updateGhostGradients(ghostParticles);
+        //Logger(DEBUG) << "      > Update limited ghost gradients";
+        //particles->updateGhostGradients(ghostParticles);
 #else
         particles->compPsijTilde(helper, config.kernelSize);
         particles->gradient(particles->rho, particles->rhoGrad);
@@ -91,26 +91,26 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      > Limiting slopes";
         //particles->slopeLimiter(config.kernelSize);
 #endif
-        Logger(INFO) << "    > Preparing Riemann solver";
-        Logger(DEBUG) << "      > Computing effective faces";
+        //Logger(INFO) << "    > Preparing Riemann solver";
+        //Logger(DEBUG) << "      > Computing effective faces";
         particles->compEffectiveFace();
 #if PERIODIC_BOUNDARIES
         particles->compEffectiveFace(ghostParticles);
 #endif
-        Logger(DEBUG) << "      > Computing fluxes";
-        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
+        //Logger(DEBUG) << "      > Computing fluxes";
+        //particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
 
 #if PERIODIC_BOUNDARIES
-        Logger(DEBUG) << "      > Computing ghost fluxes";
-        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
-                                     ghostParticles);
+        //Logger(DEBUG) << "      > Computing ghost fluxes";
+        //particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
+        //                             ghostParticles);
 #endif
-        Logger(INFO) << "    > Solving Riemann problems";
+        //Logger(INFO) << "    > Solving Riemann problems";
         //TODO: continue here with implementation after gradient check
         //particles->solveRiemannProblems(config.gamma);
 
 #if PERIODIC_BOUNDARIES
-        particles->solveRiemannProblems(ghostParticles);
+        //particles->solveRiemannProblems(ghostParticles);
 #endif
 
         Logger(INFO) << "    > Dump particles to file";
@@ -119,6 +119,8 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         Logger(INFO) << "    > Dump ghosts to file";
         ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+        Logger(INFO) << "    > Dump NNL to file";
+        particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif
 
         //Logger(ERROR) << "Aborting for debugging.";

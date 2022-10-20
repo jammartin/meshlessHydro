@@ -104,6 +104,12 @@ Particles::~Particles(){
 }
 
 void Particles::assignParticlesAndCells(Domain &domain){
+
+    // reset particles assigned to grid cells
+    for(int iGrid=0; iGrid<domain.numGridCells; ++iGrid){
+        domain.grid[iGrid].prtcls = std::vector<int>();
+    }
+
     for(int i=0; i<N; ++i){
 
         int floorX = floor((x[i]-domain.bounds.minX)/domain.cellSizeX);
@@ -184,7 +190,7 @@ void Particles::compDensity(const double &kernelSize){
 }
 
 void Particles::compOmega(int i, const double &kernelSize){
-    double omg = 0;
+    double omg = 0.;
     for (int j=0; j<noi[i]; ++j){
         double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
                     + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
@@ -532,10 +538,10 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         ghostMap[i*(DIM+1)+2] = -1;
 
         // x-direction
-        if (x[i] < domain.bounds.minX + kernelSize && x[i] > domain.bounds.minX) {
+        if (x[i] <= domain.bounds.minX + kernelSize){ // && x[i] > domain.bounds.minX) {
             ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
             foundGhostX = true;
-        } else if (domain.bounds.maxX - kernelSize < x[i] && x[i] < domain.bounds.maxX) {
+        } else if (domain.bounds.maxX - kernelSize < x[i]){ // && x[i] < domain.bounds.maxX) {
             ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
             foundGhostX = true;
         } else {
@@ -543,10 +549,10 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         }
 
         // y-direction
-        if (y[i] < domain.bounds.minY + kernelSize && y[i] > domain.bounds.minY) {
+        if (y[i] <= domain.bounds.minY + kernelSize){ // && y[i] > domain.bounds.minY) {
             ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
             foundGhostY = true;
-        } else if (domain.bounds.maxY - kernelSize < y[i] && y[i] < domain.bounds.maxY) {
+        } else if (domain.bounds.maxY - kernelSize < y[i]){ // && y[i] < domain.bounds.maxY) {
             ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             foundGhostY = true;
         } else {
@@ -565,9 +571,9 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         // create DIM extra normal particles
         if (foundGhostX && foundGhostY){
             ghostParticles.x[iGhost] = x[i];
-            if (y[i] < domain.bounds.minY + kernelSize && y[i] > domain.bounds.minY) {
+            if (y[i] <= domain.bounds.minY + kernelSize){ // && y[i] > domain.bounds.minY) {
                 ghostParticles.y[iGhost] = domain.bounds.maxY + (y[i] - domain.bounds.minY);
-            } else if (domain.bounds.maxY - kernelSize < y[i] && y[i] < domain.bounds.maxY) {
+            } else if (domain.bounds.maxY - kernelSize < y[i]){ // && y[i] < domain.bounds.maxY) {
                 ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             }
             ghostMap[i*(DIM+1)+1] = iGhost;
@@ -575,9 +581,9 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
             //              <<"ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
             //              << ghostParticles.y[iGhost] << "]";
             ++iGhost;
-            if (x[i] < domain.bounds.minX + kernelSize && x[i] > domain.bounds.minX) {
+            if (x[i] <= domain.bounds.minX + kernelSize){ // && x[i] > domain.bounds.minX) {
                 ghostParticles.x[iGhost] = domain.bounds.maxX + (x[i] - domain.bounds.minX);
-            } else if (domain.bounds.maxX - kernelSize < x[i] && x[i] < domain.bounds.maxX) {
+            } else if (domain.bounds.maxX - kernelSize < x[i]){ // && x[i] < domain.bounds.maxX) {
                 ghostParticles.x[iGhost] = domain.bounds.minX - (domain.bounds.maxX - x[i]);
             }
             ghostParticles.y[iGhost] = y[i];
@@ -691,7 +697,8 @@ void Particles::compOmega(int i, const Particles &ghostParticles, const double &
         //              << ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]] << "]";
     }
     omega[i] = omg;
-    //Logger(DEBUG) << "V[" << i << "] = " << 1./omega[i] << ", noi = " << noi[i] + noiGhosts[i];
+    //Logger(DEBUG) << "V[" << i << "] = " << 1./omega[i] << ", noiTot = " << noi[i] + noiGhosts[i]
+    //          << " noiGhosts = " << noiGhosts[i];
 }
 
 void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize){
@@ -993,10 +1000,56 @@ void Particles::solveRiemannProblems(const Particles &ghostParticles){
     //TODO: implement
 }
 
+/// debugging function dumping nearest neighbors to file
+void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
+    // open output file
+    HighFive::File h5File { filename, HighFive::File::ReadWrite |
+                                      HighFive::File::Create |
+                                      HighFive::File::Truncate };
+
+    for (int i=0; i<N; ++i){
+
+        int noiTot = noi[i] + noiGhosts[i];
+        std::vector<std::vector<double>> nnlPrtcls {};
+
+        std::vector<size_t> dataSpaceDims(2);
+        dataSpaceDims[0] = std::size_t(noiTot);
+        dataSpaceDims[1] = DIM;
+
+        for (int j=0; j<noi[i]; ++j){
+            nnlPrtcls.push_back(std::vector<double>(DIM));
+            nnlPrtcls[j][0] = x[nnl[i*MAX_NUM_INTERACTIONS+j]];
+            nnlPrtcls[j][1] = y[nnl[i*MAX_NUM_INTERACTIONS+j]];
+#if DIM == 3
+            nnlPrtcls[j][2] = z[nnl[i*MAX_NUM_INTERACTIONS+j]];
+#endif
+        }
+
+        for (int j=0; j<noiGhosts[i]; ++j){
+            nnlPrtcls.push_back(std::vector<double>(DIM));
+            nnlPrtcls[j+noi[i]][0] = ghostParticles.x[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
+            nnlPrtcls[j+noi[i]][1] = ghostParticles.y[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
+#if DIM == 3
+            nnlPrtcls[j+noi[i]][2] = ghostParticles.z[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
+#endif
+        }
+
+        HighFive::DataSet nnlDataSet = h5File.createDataSet<double>("/nnlPrtcls" + std::to_string(i),
+                                                                    HighFive::DataSpace(dataSpaceDims));
+        nnlDataSet.write(nnlPrtcls);
+    }
+}
+
+
 #endif
 
 void Particles::move(const double &dt, Domain &domain){
+
     for(int i=0; i<N; ++i) {
+
+        //Logger(DEBUG) << "v@" << i <<  " = [" << vx[i] << ", " << vy[i] << "]"
+        //            << ", x[n] = [" << x[i] << ", " << y[i] << "]";
+
         x[i] = x[i] + vx[i] * dt;
         y[i] = y[i] + vy[i] * dt;
 #if DIM == 3
@@ -1005,22 +1058,24 @@ void Particles::move(const double &dt, Domain &domain){
 #if PERIODIC_BOUNDARIES
         if (x[i] < domain.bounds.minX) {
             x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
-        } else if (domain.bounds.maxX < x[i]) {
+        } else if (domain.bounds.maxX <= x[i]) {
             x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
         }
         if (y[i] < domain.bounds.minY) {
             y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
-        } else if (domain.bounds.maxY < y[i]) {
+        } else if (domain.bounds.maxY <= y[i]) {
             y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
         }
 #if DIM ==3
         if (z[i] < domain.bounds.minZ) {
             z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
-        } else if (domain.bounds.maxZ < z[i]) {
+        } else if (domain.bounds.maxZ <= z[i]) {
             z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
         }
 #endif
 #endif
+        //Logger(DEBUG) << "                               x[n+1] = ["
+        //          << x[i] << ", " << y[i] << "]";
     }
 }
 
