@@ -9,7 +9,7 @@ MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
                                Domain::Cell bounds) : config { config }, particles { particles },
                                                       domain(bounds)
 #if PERIODIC_BOUNDARIES
-                                                      , ghostParticles(DIM*particles->N) // TODO: memory optimization
+                                                      , ghostParticles(DIM*particles->N, true) // TODO: memory optimization
 #endif
                                                       {
 
@@ -59,12 +59,8 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         particles->updateGhostState(ghostParticles);
         particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
-        //particles->updateGhostPsijTilde(ghostParticles);
+
         particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
-
-        //Logger(ERROR) << "Aborting for debugging.";
-        //exit(6);
-
         particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
         particles->gradient(particles->vy, particles->vyGrad, ghostParticles.vy, ghostParticles);
 #if DIM == 3
@@ -93,9 +89,9 @@ void MeshlessScheme::run(){
 #endif
         //Logger(INFO) << "    > Preparing Riemann solver";
         //Logger(DEBUG) << "      > Computing effective faces";
-        particles->compEffectiveFace();
+        //particles->compEffectiveFace();
 #if PERIODIC_BOUNDARIES
-        particles->compEffectiveFace(ghostParticles);
+        //particles->compEffectiveFace(ghostParticles);
 #endif
         //Logger(DEBUG) << "      > Computing fluxes";
         //particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
@@ -106,7 +102,6 @@ void MeshlessScheme::run(){
         //                             ghostParticles);
 #endif
         //Logger(INFO) << "    > Solving Riemann problems";
-        //TODO: continue here with implementation after gradient check
         //particles->solveRiemannProblems(config.gamma);
 
 #if PERIODIC_BOUNDARIES

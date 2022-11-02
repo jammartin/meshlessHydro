@@ -22,7 +22,7 @@ namespace Kernel {
 class Particles {
 
 public:
-    Particles(int numParticles);
+    Particles(int numParticles, bool ghosts=false);
     ~Particles();
 
     int N;
@@ -66,7 +66,6 @@ public:
 
     /// functions to copy computed quantities to ghosts needed for further processing
     void updateGhostState(Particles &ghostParticles);
-    void updateGhostPsijTilde(Particles &ghostParticles); //TODO: remove
     void updateGhostGradients(Particles &ghostParticles);
 
     void solveRiemannProblems(const Particles &ghostParticles);
@@ -92,7 +91,7 @@ private:
     int *nnl; // nearest neighbor list
     int *noi;  // number of interactions
     double *omega; // store omega to avoid recomputing
-    double (*psijTilde_xi)[DIM]; // TODO: remove this buffer
+    double (*psijTilde_xi)[DIM];
     double (*Aij)[DIM];
     double (*WijL)[DIM+2], (*WijR)[DIM+2]; // DIM velocity components, density and pressure
     double (*Fij)[DIM+2];
@@ -109,7 +108,7 @@ private:
     void compOmega(int i, const Particles &ghostParticles, const double &kernelSize);
     int *nnlGhosts;
     int *noiGhosts;
-    //double (*psijTilde_xiGhosts)[DIM]; // TODO: remove this buffer
+    double (*psijTilde_xiGhosts)[DIM];
     double (*AijGhosts)[DIM];
     double (*WijLGhosts)[DIM+2], (*WijRGhosts)[DIM+2]; // DIM velocity components, density and pressure
     double (*FijGhosts)[DIM+2];
@@ -121,6 +120,8 @@ private:
     double xi[DIM];
     double xj[DIM];
     double xjGhost[DIM];
+
+    bool ghosts;
 };
 
 

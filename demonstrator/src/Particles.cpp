@@ -21,7 +21,7 @@ double Kernel::cubicSpline(const double &r, const double &h) {
     }
 }
 
-Particles::Particles(int numParticles) : N { numParticles }{
+Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts { ghosts }{
     // allocate memory
     matId = new int[numParticles];
     cell = new int[numParticles];
@@ -38,32 +38,38 @@ Particles::Particles(int numParticles) : N { numParticles }{
     vyGrad = new double[numParticles][DIM];
     vzGrad = new double[numParticles][DIM];
     PGrad = new double[numParticles][DIM];
+
+    //TODO: check if this is needed as array
+    //B = new double[numParticles][DIM*DIM];
 #if DIM == 3
     z = new double[numParticles];
     vz = new double[numParticles];
 #endif
-    nnl = new int[numParticles*MAX_NUM_INTERACTIONS];
-    noi = new int[numParticles];
     omega = new double[numParticles];
-    psijTilde_xi = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
-    Aij = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
-    WijL = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
-    WijR = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
-    Fij = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
+    if (!ghosts){
+        nnl = new int[numParticles*MAX_NUM_INTERACTIONS];
+        noi = new int[numParticles];
+        psijTilde_xi = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
+        Aij = new double[numParticles*MAX_NUM_INTERACTIONS][DIM];
+        WijL = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
+        WijR = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2];
+        Fij = new double[numParticles*MAX_NUM_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
+
 #if PERIODIC_BOUNDARIES
-    // estimated memory allocation
-    nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
-    noiGhosts = new int[numParticles];
-    ghostMap = new int[numParticles*(DIM+1)]; // TODO: this is only applicable for DIM==2
-    //psijTilde_xiGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
-    AijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
-    WijLGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
-    WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
-    FijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
+        // estimated memory allocation
+        nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
+        noiGhosts = new int[numParticles];
+        ghostMap = new int[numParticles*(DIM+1)]; // TODO: this is only applicable for DIM==2
+        psijTilde_xiGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
+        AijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
+        WijLGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
+        WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
+        FijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
 #endif
+    }
 }
 
-Particles::~Particles(){
+Particles::~Particles() {
     delete[] matId;
     delete[] cell;
     delete[] m;
@@ -79,28 +85,30 @@ Particles::~Particles(){
     delete[] vyGrad;
     delete[] vzGrad;
     delete[] PGrad;
-    delete[] WijL;
-    delete[] WijR;
-    delete[] Fij;
-#if DIM == 3
-    delete[] z;
-    delete[] vz;
-#endif
-    delete[] nnl;
-    delete[] noi;
     delete[] omega;
-    delete[] psijTilde_xi;
-    delete[] Aij;
-#if PERIODIC_BOUNDARIES
-    delete[] nnlGhosts;
-    delete[] noiGhosts;
-    //delete[] psijTilde_xiGhosts;
-    delete[] AijGhosts;
-    delete[] WijLGhosts;
-    delete[] WijRGhosts;
-    delete[] ghostMap;
-    delete[] FijGhosts;
+    if (!ghosts) {
+        delete[] WijL;
+        delete[] WijR;
+        delete[] Fij;
+#if DIM == 3
+        delete[] z;
+delete[] vz;
 #endif
+        delete[] nnl;
+        delete[] noi;
+        delete[] psijTilde_xi;
+        delete[] Aij;
+#if PERIODIC_BOUNDARIES
+        delete[] nnlGhosts;
+        delete[] noiGhosts;
+        delete[] psijTilde_xiGhosts;
+        delete[] AijGhosts;
+        delete[] WijLGhosts;
+        delete[] WijRGhosts;
+        delete[] ghostMap;
+        delete[] FijGhosts;
+#endif
+    }
 }
 
 void Particles::assignParticlesAndCells(Domain &domain){
@@ -209,7 +217,6 @@ void Particles::compOmega(int i, const double &kernelSize){
 }
 
 void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
-
     for (int i=0; i<N; ++i){
 
         // reset buffer
@@ -266,9 +273,9 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] = 0.;
+                psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]+i*MAX_NUM_INTERACTIONS][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] += B[DIM * alpha + beta] * (xj[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS+i*MAX_NUM_INTERACTIONS]][alpha] += B[DIM * alpha + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
             }
         }
@@ -284,7 +291,7 @@ void Particles::gradient(double *f, double (*grad)[DIM]){
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
-                                  * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
+                                  * psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha];
             }
         }
     }
@@ -302,9 +309,15 @@ void Particles::compPressure(const double &gamma){
 void Particles::compEffectiveFace(){
     for (int i=0; i<N; ++i){
         for (int j=0; j<noi[i]; ++j){
+            int ji = nnl[i*MAX_NUM_INTERACTIONS+j]; // index i of particle j
+            // search neighbor i in nnl[] of j
+            int ij = 0;
+            for(ij=0; ij<noi[ji]; ++ij){
+                if (nnl[ij+ji*MAX_NUM_INTERACTIONS] == i) break;
+            }
             for (int alpha=0; alpha<DIM; ++alpha){
-                Aij[i*MAX_NUM_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xi[i][alpha]
-                        - 1./omega[nnl[i*MAX_NUM_INTERACTIONS+j]]*psijTilde_xi[nnl[i*MAX_NUM_INTERACTIONS+j]][alpha];
+                Aij[i*MAX_NUM_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xi[i*MAX_NUM_INTERACTIONS+j][alpha]
+                        - 1./omega[ji]*psijTilde_xi[ij+ji*MAX_NUM_INTERACTIONS][alpha];
             }
         }
     }
@@ -620,16 +633,6 @@ void Particles::updateGhostState(Particles &ghostParticles){
     }
 }
 
-void Particles::updateGhostPsijTilde(Particles &ghostParticles){
-    for (int i=0; i<N*(DIM+1); ++i){
-        if (ghostMap[i] >= 0){
-            for (int alpha=0; alpha<DIM; ++alpha){
-                ghostParticles.psijTilde_xi[ghostMap[i]][alpha] = psijTilde_xi[i/(DIM+1)][alpha];
-            }
-        }
-    }
-}
-
 void Particles::updateGhostGradients(Particles &ghostParticles){
     for (int i=0; i<N*(DIM+1); ++i){
         if (ghostMap[i] >= 0){
@@ -730,6 +733,7 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
 #endif
             double r = sqrt(dSqr);
+            //double psij_xi = kernel(r, kernelSize)/omega[nnl[j + i * MAX_NUM_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize)/omega[i];
 
             xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
@@ -758,6 +762,7 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             dSqr += pow(z[i] - ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
 #endif
             double r = sqrt(dSqr);
+            //double psij_xi = kernel(r, kernelSize)/ghostParticles.omega[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize)/omega[i];
 
             xjGhost[0] = ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
@@ -814,19 +819,22 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
 #endif
             double r = sqrt(dSqr);
+            //double psij_xi = kernel(r, kernelSize) / omega[nnl[j + i * MAX_NUM_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
             xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
             xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] = 0.;
+                //psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]+i*MAX_NUM_INTERACTIONS][alpha] = 0.;
+                psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
+                    //psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]+i*MAX_NUM_INTERACTIONS][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] += B[alpha * DIM + beta] * (xj[beta] - xi[beta]) * psij_xi;
                 }
-                //if(i == 7){
-                //    Logger(DEBUG) << "psijTilde_xi@" << j << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
-                //                  //<< ", f[j] = " << f[nnl[j + i * MAX_NUM_INTERACTIONS]] << ", f[i] = " << f[i];
+
+                //if(i == 86){
+                //    Logger(DEBUG) << "psijTilde_xi[" << alpha << "]@" << nnl[j + i * MAX_NUM_INTERACTIONS] << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
                 //}
             }
         }
@@ -839,19 +847,21 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
             dSqr += pow(z[i] - ghostParticles.z[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]], 2);
 #endif
             double r = sqrt(dSqr);
+            //double psij_xi = kernel(r, kernelSize) / ghostParticles.omega[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
             xjGhost[0] = ghostParticles.x[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
             xjGhost[1] = ghostParticles.y[nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS]];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
-                ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha] = 0.;
+                //psijTilde_xiGhosts[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]+i*MAX_NUM_GHOST_INTERACTIONS][alpha] = 0.;
+                psijTilde_xiGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {
-                    ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
+                    //psijTilde_xiGhosts[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]+i*MAX_NUM_GHOST_INTERACTIONS][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
+                    psijTilde_xiGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS][alpha] += B[alpha * DIM + beta] * (xjGhost[beta] - xi[beta]) * psij_xi;
                 }
-                //if(i == 7){
-                //    Logger(DEBUG) << "psijTildeGhost_xi@" << j << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
-                //                  //<< ", fGhost[j] = " << fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] << ", f[i] = " << f[i];
+                //if(i == 86){
+                //    Logger(DEBUG) << "psijTildeGhost_xi[" << alpha << "]@" << nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS] << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
                 //}
             }
         }
@@ -867,29 +877,55 @@ void Particles::gradient(double *f, double (*grad)[DIM], double *fGhost, const P
         //Logger(DEBUG) << "      > noi[" << i << "] = " << noi[i]
         //              << ", noiGhosts[" << i << "] = " << noiGhosts[i];
 
+        //if(i == 86) Logger(DEBUG) << "fi[" << i << "] = " << f[i];
+
         for (int j = 0; j < noi[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (f[nnl[j + i * MAX_NUM_INTERACTIONS]] - f[i])
-                                  * psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha];
+                                  //* psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]+i*MAX_NUM_INTERACTIONS][alpha];
+                                  * psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha];
+
+                //if(i == 86){
+                //    Logger(DEBUG) << "psijTilde_xi[" << alpha << "]@" << nnl[j + i * MAX_NUM_INTERACTIONS]
+                //              << " = " << psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]][alpha]
+                //              << ", f[" << nnl[j + i * MAX_NUM_INTERACTIONS] << "] = " << f[nnl[j + i * MAX_NUM_INTERACTIONS]];
+                //}
             }
         }
 
         for (int j = 0; j < noiGhosts[i]; ++j) {
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 grad[i][alpha] += (fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]] - f[i])
-                                  * ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha];
-            }
+                                  //* psijTilde_xiGhosts[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]+i*MAX_NUM_GHOST_INTERACTIONS][alpha];
+                                  * psijTilde_xiGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS][alpha];
+                // if(i == 86){
+                //    Logger(DEBUG) << "psijTildeGhost_xi[" << alpha << "]@" << nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]
+                //              << " = " << ghostParticles.psijTilde_xi[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]][alpha]
+                //              << ", fGhost[" << nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS] << "] = " << fGhost[nnlGhosts[j + i * MAX_NUM_GHOST_INTERACTIONS]];
+                //}
+                            }
         }
+
+        //for (int alpha=0; alpha < DIM; ++alpha ){
+        //    if(i == 86) Logger(DEBUG) << "grad[" << i << "][" << alpha << "] = " << grad[i][alpha];
+        //}
     }
 }
 
 void Particles::compEffectiveFace(const Particles &ghostParticles){
+    // TODO: compute psijTilde_xi for ghost particles
+
     for (int i=0; i<N; ++i){
         for (int j=0; j<noiGhosts[i]; ++j){
+            int ji = nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]; // index i of particle j
+            // search neighbor i in nnlGhosts[] of j
+            int ij = 0;
+            for(ij=0; ij<noiGhosts[ji]; ++ij){
+                if (nnlGhosts[ij+ji*MAX_NUM_GHOST_INTERACTIONS] == i) break;
+            }
             for (int alpha=0; alpha<DIM; ++alpha){
-                AijGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xi[i][alpha]
-                                                       - 1./ghostParticles.omega[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]]
-                                                       * ghostParticles.psijTilde_xi[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]][alpha];
+                AijGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xiGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j][alpha]
+                                                       - 1./omega[ji]*psijTilde_xiGhosts[ij+ji*MAX_NUM_GHOST_INTERACTIONS][alpha];
             }
         }
     }
