@@ -45,12 +45,11 @@ public:
 
     void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma);
 
-    /// functions collecting the fluxes
-    void collectMassFluxes();
-    void collectVelocityFluxes();
-    void collectEnergyFluxes();
-
     void solveRiemannProblems(const double &gamma);
+
+    void collectFluxes(Helper &helper);
+
+    void updateStateAndPosition(const double &dt);
 
 
 #if PERIODIC_BOUNDARIES
@@ -66,13 +65,8 @@ public:
 
     /// functions to copy computed quantities to ghosts needed for further processing
     void updateGhostState(Particles &ghostParticles);
+    void updateGhostPsijTilde(Particles &ghostParticles);
     void updateGhostGradients(Particles &ghostParticles);
-
-    void solveRiemannProblems(const Particles &ghostParticles);
-
-    void collectMassFluxes(const Particles &ghostParticles);
-    void collectVelocityFluxes(const Particles &ghostParticles);
-    void collectEnergyFluxes(const Particles &ghostParticles);
 
     void dumpNNL(std::string filename, const Particles &ghostParticles);
 
@@ -95,10 +89,12 @@ private:
     double (*Aij)[DIM];
     double (*WijL)[DIM+2], (*WijR)[DIM+2]; // DIM velocity components, density and pressure
     double (*Fij)[DIM+2];
+    double (*vFrame)[DIM];
+
     double (*kernel)(const double&, const double&){ &Kernel::cubicSpline };
 
     /// variables for integration
-    double *mF, *uF, (*vF)[DIM]; //TODO: allocate
+    double *mF, *eF, (*vF)[DIM];
 
     void compOmega(int i, const double &kernelSize);
     void slopeLimiter(double *f, double (*grad)[DIM], const double &kernelSize,
@@ -112,6 +108,7 @@ private:
     double (*AijGhosts)[DIM];
     double (*WijLGhosts)[DIM+2], (*WijRGhosts)[DIM+2]; // DIM velocity components, density and pressure
     double (*FijGhosts)[DIM+2];
+    double (*vFrameGhosts)[DIM];
     int *ghostMap;
 #endif
 

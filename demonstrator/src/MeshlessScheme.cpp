@@ -21,10 +21,9 @@ MeshlessScheme::MeshlessScheme(Configuration config, Particles *particles,
 void MeshlessScheme::run(){
     double t = 0;
     int step = 0;
-    do {
-        std::stringstream stepss;
-        stepss << std::setw(6) << std::setfill('0') << step;
 
+    do {
+        Logger(INFO) << "  > TIME: " << t;
         Logger(INFO) << "    > Assigning particles ...";
         particles->assignParticlesAndCells(domain);
         Logger(INFO) << "    > ... done.";
@@ -50,7 +49,7 @@ void MeshlessScheme::run(){
         particles->compDensity(ghostParticles, config.kernelSize);
 #endif
 
-        Logger(DEBUG) << "  SANITY CHECK > V_tot = " << particles->sumVolume();
+        Logger(DEBUG) << "      SANITY CHECK > V_tot = " << particles->sumVolume();
 
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
@@ -59,6 +58,8 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         particles->updateGhostState(ghostParticles);
         particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
+        Logger(DEBUG) << "      > Updated ghost psij_xiTilde";
+        particles->updateGhostPsijTilde(ghostParticles);
 
         particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
         particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
@@ -69,7 +70,8 @@ void MeshlessScheme::run(){
         particles->gradient(particles->P, particles->PGrad, ghostParticles.P, ghostParticles);
         Logger(DEBUG) << "      > Update ghost gradients";
         particles->updateGhostGradients(ghostParticles);
-        // TODO: check how to properly limit
+
+        // TODO: Check slope limiter
         //Logger(DEBUG) << "      > Limiting slopes";
         //particles->slopeLimiter(config.kernelSize, &ghostParticles);
         //Logger(DEBUG) << "      > Update limited ghost gradients";
@@ -84,45 +86,52 @@ void MeshlessScheme::run(){
 #endif
         particles->gradient(particles->P, particles->PGrad);
         // TODO: check how to properly limit gradiens
-        Logger(DEBUG) << "      > Limiting slopes";
+        //Logger(DEBUG) << "      > Limiting slopes";
         //particles->slopeLimiter(config.kernelSize);
 #endif
-        //Logger(INFO) << "    > Preparing Riemann solver";
-        //Logger(DEBUG) << "      > Computing effective faces";
-        //particles->compEffectiveFace();
+        Logger(INFO) << "    > Preparing Riemann solver";
+        Logger(DEBUG) << "      > Computing effective faces";
+        particles->compEffectiveFace();
 #if PERIODIC_BOUNDARIES
-        //particles->compEffectiveFace(ghostParticles);
+        particles->compEffectiveFace(ghostParticles);
 #endif
-        //Logger(DEBUG) << "      > Computing fluxes";
-        //particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
+        Logger(DEBUG) << "      > Computing fluxes";
+        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
 
 #if PERIODIC_BOUNDARIES
-        //Logger(DEBUG) << "      > Computing ghost fluxes";
-        //particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
-        //                             ghostParticles);
+        Logger(DEBUG) << "      > Computing ghost fluxes";
+        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
+                                     ghostParticles);
 #endif
-        //Logger(INFO) << "    > Solving Riemann problems";
-        //particles->solveRiemannProblems(config.gamma);
-
-#if PERIODIC_BOUNDARIES
-        //particles->solveRiemannProblems(ghostParticles);
-#endif
-
-        Logger(INFO) << "    > Dump particles to file";
+        std::stringstream stepss;
+        Logger(INFO) << "   > Dump particle distribution";
+        stepss << std::setw(6) << std::setfill('0') << step;
+        Logger(INFO) << "      > Dump particles to file";
         particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 
 #if PERIODIC_BOUNDARIES
-        Logger(INFO) << "    > Dump ghosts to file";
+        Logger(INFO) << "      > Dump ghosts to file";
         ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
-        Logger(INFO) << "    > Dump NNL to file";
+        Logger(INFO) << "      > Dump NNL to file";
         particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif
 
-        //Logger(ERROR) << "Aborting for debugging.";
-        //exit(6);
+        if (t>=config.timeEnd){
+            Logger(INFO) << "  > FINISHED!";
+            break;
+        }
 
-        Logger(INFO) << "    > Moving particles";
-        particles->move(config.timeStep, domain);
+        Logger(INFO) << "    > Solving Riemann problems";
+        particles->solveRiemannProblems(config.gamma);
+
+        Logger(INFO) << "    > Collecting fluxes";
+        particles->collectFluxes(helper);
+
+        Logger(INFO) << "    > Updating state";
+        particles->updateStateAndPosition(config.timeStep);
+
+        //Logger(INFO) << "    > Moving particles";
+        //particles->move(config.timeStep, domain);
 
         t += config.timeStep;
         ++step;
