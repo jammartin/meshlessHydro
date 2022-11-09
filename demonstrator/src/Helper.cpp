@@ -27,7 +27,7 @@ double Helper::dotProduct(double *a, double *b){
 
 void Helper::rotationMatrix2D(double *a, double *b, double *Lambda){
     Lambda[0] = a[0]*a[1] + b[0]*b[1];
-    Lambda[1] = a[0]*b[1] - a[1]*b[0];
-    Lambda[2] = -(a[0]*b[1] - a[1]*b[0]);
+    Lambda[1] = -(a[0]*b[1] - a[1]*b[0]);
+    Lambda[2] = a[0]*b[1] - a[1]*b[0];
     Lambda[3] = Lambda[0];
 }

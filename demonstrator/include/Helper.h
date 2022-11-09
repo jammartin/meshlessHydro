@@ -30,7 +30,7 @@ public:
      * @param[in] a normed vector to be aligned with b
      * @param[in] b normed vector to which a shall be rotated by the matrix
      * @param[out] Lambda rotation matrix, must be pre-allocated [DIM*DIM]
-     *             indexed lambda_ij = Lambda[i+DIM*j], DIM=2
+     *             indexed lambda_ij = Lambda[j+DIM*i], DIM=2
      */
     static void rotationMatrix2D(double *a, double *b, double *Lambda);
 

@@ -66,16 +66,16 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
         nnlGhosts = new int[numParticles*MAX_NUM_GHOST_INTERACTIONS];
         noiGhosts = new int[numParticles];
         ghostMap = new int[numParticles*(DIM+1)]; // TODO: this is only applicable for DIM==2
+        psijTilde_xiGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
         AijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
         WijLGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
         WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
         FijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
         vFrameGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
 #endif
+    } else {
+        parent = new int[numParticles]; // store index of original node
     }
-#if PERIODIC_BOUNDARIES
-    psijTilde_xiGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
-#endif
 }
 
 Particles::~Particles() {
@@ -115,6 +115,7 @@ Particles::~Particles() {
 #if PERIODIC_BOUNDARIES
         delete[] nnlGhosts;
         delete[] noiGhosts;
+        delete[] psijTilde_xiGhosts;
         delete[] AijGhosts;
         delete[] WijLGhosts;
         delete[] WijRGhosts;
@@ -122,10 +123,9 @@ Particles::~Particles() {
         delete[] FijGhosts;
         delete[] vFrameGhosts;
 #endif
+    } else {
+        delete[] parent;
     }
-#if PERIDOIC_BOUNDARIES
-    delete[] psijTilde_xiGhosts;
-#endif
 }
 
 void Particles::assignParticlesAndCells(Domain &domain){
@@ -140,12 +140,13 @@ void Particles::assignParticlesAndCells(Domain &domain){
         int floorX = floor((x[i]-domain.bounds.minX)/domain.cellSizeX);
         int floorY = floor((y[i]-domain.bounds.minY)/domain.cellSizeY);
 
-        if (x[i] == domain.bounds.maxX){
+        // TODO: check if block below is necessary
+        /*if (x[i] == domain.bounds.maxX){
             floorX -= 1;
         }
         if (y[i] == domain.bounds.maxY){
             floorY -= 1;
-        }
+        }*/
 
         int iGrid = floorX + floorY * domain.cellsX
 #if DIM == 3
@@ -328,7 +329,7 @@ void Particles::compEffectiveFace(){
         for (int j=0; j<noi[i]; ++j){
             int ji = nnl[i*MAX_NUM_INTERACTIONS+j]; // index i of particle j
             // search neighbor i in nnl[] of j
-            int ij = 0;
+            int ij;
             for(ij=0; ij<noi[ji]; ++ij){
                 if (nnl[ij+ji*MAX_NUM_INTERACTIONS] == i) break;
             }
@@ -368,6 +369,7 @@ void Particles::slopeLimiter(const double &kernelSize,
 void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kernelSize,
                              Particles *ghostParticles, double *fGhost){
     double xij[DIM], xijxi[DIM];
+    Logger(DEBUG) << "#################### NEXT GRADIENT ####################";
 
     for (int i=0; i<N; ++i){
         double psiMaxNgb { std::numeric_limits<double>::min() };
@@ -378,12 +380,17 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         for (int jn=0; jn<noi[i]; ++jn) {
             int j = nnl[i * MAX_NUM_INTERACTIONS + jn];
 
-            xij[0] = x[i] + kernelSize / 2. * (x[j] - x[i]);
-            xij[1] = y[i] + kernelSize / 2. * (y[j] - y[i]);
+            //xij[0] = x[i] + kernelSize / 2. * (x[j] - x[i]);
+            //xij[1] = y[i] + kernelSize / 2. * (y[j] - y[i]);
+
+            xij[0] = x[i] + kernelSize / 4. * (x[j] - x[i]);
+            xij[1] = y[i] + kernelSize / 4. * (y[j] - y[i]);
+
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
-            xij[2] = z[i] + kernelSize/2. * (z[j] - z[i]);
+            //xij[2] = z[i] + kernelSize/2. * (z[j] - z[i]);
+            xij[2] = z[i] + kernelSize/4. * (z[j] - z[i]);
             xijxi[2] = xij[2] - z[i];
 #endif
             if (psiMaxNgb < f[j]) psiMaxNgb = f[j];
@@ -397,12 +404,19 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         for (int jn=0; jn<noiGhosts[i]; ++jn) {
             int j = nnlGhosts[i * MAX_NUM_GHOST_INTERACTIONS + jn];
 
-            xij[0] = x[i] + kernelSize / 2. * (ghostParticles->x[j] - x[i]);
-            xij[1] = y[i] + kernelSize / 2. * (ghostParticles->y[j] - y[i]);
+            //xij[0] = x[i] + kernelSize / 2. * (ghostParticles->x[j] - x[i]);
+            //xij[1] = y[i] + kernelSize / 2. * (ghostParticles->y[j] - y[i]);
+
+            xij[0] = x[i] + kernelSize / 4. * (ghostParticles->x[j] - x[i]);
+            xij[1] = y[i] + kernelSize / 4. * (ghostParticles->y[j] - y[i]);
+
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
-            xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
+            //xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
+
+            xij[2] = z[i] + kernelSize/4. * (ghostParticles->z[j] - z[i]);
+
             xijxi[2] = xij[2] - z[i];
 #endif
             if (psiMaxNgb < fGhost[j]) psiMaxNgb = fGhost[j];
@@ -417,12 +431,12 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         double alphaMax = abs((psiMaxNgb - f[i]) / (psiMaxMid - f[i]));
         double alphaMin = abs((f[i] - psiMinNgb) / (f[i] - psiMinMid));
 
-        /*if(i==4){
-            Logger(DEBUG) << "alphaMin = " << alphaMin << ", alphaMax = " << alphaMax
-                        << ", psiMinNgb = " << psiMinNgb << ", psiMaxNgb = " << psiMaxNgb
-                        << ", psiMinNgb = " << psiMinMid << ", psiMaxNgb = " << psiMaxMid
-                        << ", f[i] = " << f[i];
-        }*/
+        //if(i==4){
+        Logger(DEBUG) << "alphaMin = " << alphaMin << ", alphaMax = " << alphaMax
+                    << ", psiMinNgb = " << psiMinNgb << ", psiMaxNgb = " << psiMaxNgb
+                    << ", psiMinNgb = " << psiMinMid << ", psiMaxNgb = " << psiMaxMid
+                    << ", f[i] = " << f[i];
+        //}
 
         if (alphaMin <= alphaMax && BETA*alphaMin < 1.){
             Logger(DEBUG) << "        > Limiting gradient with alphaMin@" << i << ", alpha = "
@@ -457,8 +471,11 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xjxi[0] = x[j] - x[i];
             xjxi[1] = y[j] - y[i];
 
-            xij[0] = x[i] + kernelSize/2. * (xjxi[0]);
-            xij[1] = y[i] + kernelSize/2. * (xjxi[1]);
+            //xij[0] = x[i] + kernelSize/2. * xjxi[0];
+            //xij[1] = y[i] + kernelSize/2. * xjxi[1];
+
+            xij[0] = x[i] + kernelSize/4. * xjxi[0];
+            xij[1] = y[i] + kernelSize/4. * xjxi[1];
 
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
@@ -467,7 +484,10 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xijxj[1] = xij[1] - y[j];
 #if DIM==3
             xjxi[2] = z[j] - z[i];
-            xij[2] = z[i] + kernelSize/2. * (xjxi[2]);
+            //xij[2] = z[i] + kernelSize/2. * xjxi[2];
+
+            xij[2] = z[i] + kernelSize/4. * xjxi[2];
+
             xijxi[2] = xij[2] - z[i];
             xijxj[2] = xij[2] - z[j];
 #endif
@@ -543,15 +563,22 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
 }
 
 
-void Particles::solveRiemannProblems(const double &gamma){
+//TODO: remove ghost particles as argument, only used for debugging
+void Particles::solveRiemannProblems(const double &gamma, const Particles &ghostParticles){
     for (int i=0; i<N; ++i){
 
-        if (!(i % (N/VERBOSITY_PARTICLES))){
-            Logger(DEBUG) << "        > i = " << i;
-        }
+        //if (!(i % (N/VERBOSITY_PARTICLES))){
+        //    Logger(DEBUG) << "        > i = " << i;
+        //}
+        //Logger(DEBUG) << "        > i = " << i << ", V = " << 1./omega[i];
 
         for (int j=0; j<noi[i]; ++j){
             int ii = i*MAX_NUM_INTERACTIONS+j; // interaction index
+            //Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", j = " << nnl[ii];
+            //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
+            //          << x[nnl[ii]] << ", " << y[nnl[ii]] << "]";
+            //Logger(DEBUG) << "vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+
             Riemann solver { WijR[ii], WijL[ii], Aij[ii] };
             solver.exact(Fij[ii], gamma);
         }
@@ -559,6 +586,11 @@ void Particles::solveRiemannProblems(const double &gamma){
 #if PERIODIC_BOUNDARIES
         for (int j=0; j<noiGhosts[i]; ++j){
             int ii = i*MAX_NUM_GHOST_INTERACTIONS+j; // interaction index
+            //Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", jGhost = " << nnlGhosts[ii];
+            //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
+            //              << ghostParticles.x[nnlGhosts[ii]] << ", " << ghostParticles.y[nnlGhosts[ii]] << "]";
+            //Logger(DEBUG) << "vFrameGhosts = [" << vFrameGhosts[ii][0] << ", " << vFrameGhosts[ii][1] << "]";
+
             Riemann solver { WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii] };
             solver.exact(FijGhosts[ii], gamma);
         }
@@ -566,7 +598,7 @@ void Particles::solveRiemannProblems(const double &gamma){
     }
 }
 
-void Particles::collectFluxes(Helper &helper){
+void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
     for (int i=0; i<N; ++i){
         mF[i] = 0.;
 
@@ -577,12 +609,18 @@ void Particles::collectFluxes(Helper &helper){
 #endif
         eF[i] = 0.;
 
+        //Logger(DEBUG) << "      > i = " << i;
+
         for(int j=0; j<noi[i]; ++j){
             int ii = j+i*MAX_NUM_INTERACTIONS;
             double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
 
             /// MASS FLUXES
             mF[i] += AijNorm*Fij[ii][0];
+
+            //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
+            //          << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
+            //          << ", mF[ii] = " << Fij[ii][0] << ", AijNorm = " << AijNorm;
 
             /// VELOCITY FLUXES
             // TODO: encapsulate block below into function
@@ -609,18 +647,34 @@ void Particles::collectFluxes(Helper &helper){
             // rotate states back to reference frame
 
             double LambdaInv[DIM*DIM];
-            Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
-            helper.inverseMatrix(LambdaInv, DIM);
-            //TODO: end block
+            //Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
+
+            //Logger(DEBUG) << "xi = [" << x[i] << "," << y[i] << "]"
+            //          << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]";
+            //Logger(DEBUG) << "hatAij = " << "[" << hatAij[0] << ", " << hatAij[1] << "]";
+            //Logger(DEBUG) << "LambdaInv = [" << LambdaInv[0] << ", " << LambdaInv[1]
+            //              << ", " << LambdaInv[2] << ", " << LambdaInv[3] << "]";
+
+            //helper.inverseMatrix(LambdaInv, DIM);
+            Helper::rotationMatrix2D(hatAij, unitX, LambdaInv);
+
+            //Logger(DEBUG) << "LambdaInv = [" << LambdaInv[0] << ", " << LambdaInv[1]
+            //          << ", " << LambdaInv[2] << ", " << LambdaInv[3] << "]";
 
             double vFrotate[DIM];
             vFrotate[0] = LambdaInv[0]*Fij[ii][2]+LambdaInv[1]*Fij[ii][3];
             vFrotate[1] = LambdaInv[2]*Fij[ii][2]+LambdaInv[3]*Fij[ii][3];
 
+            //Logger(DEBUG) << "    > i = " << i << ", ii = " << ii
+            //          << ", vFrotate = [" << vFrotate[0] << ", " << vFrotate[1] << "]";
+
             // allocate buffer for energy update
             double Fv[DIM];
             Fv[0] = Helper::dotProduct(hatAij, vFrotate) + Fij[ii][0]*vFrame[ii][0];
             Fv[1] = Helper::dotProduct(hatAij, vFrotate) + Fij[ii][0]*vFrame[ii][1];
+
+            //Fv[0] = vFrotate[0] + Fij[ii][0]*vFrame[ii][0];
+            //Fv[1] = vFrotate[1] + Fij[ii][0]*vFrame[ii][1];
 
             vF[i][0] += AijNorm*Fv[0];
             vF[i][1] += AijNorm*Fv[1];
@@ -640,6 +694,11 @@ void Particles::collectFluxes(Helper &helper){
 
             /// MASS FLUXES
             mF[i] += AijNorm*FijGhosts[ii][0];
+
+            //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
+            //              << ", xjGhost = [" << ghostParticles.x[nnlGhosts[ii]] << ", " << ghostParticles.y[nnlGhosts[ii]] << "]"
+            //              << ", mF[ii] = " << FijGhosts[ii][0] << ", AijNorm = " << AijNorm;
+
             // TODO: encapsulate block below into function
             double hatAij[DIM];
 
@@ -664,8 +723,10 @@ void Particles::collectFluxes(Helper &helper){
             // rotate states back to reference frame
 
             double LambdaInv[DIM*DIM];
-            Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
-            helper.inverseMatrix(LambdaInv, DIM);
+            //Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
+            //helper.inverseMatrix(LambdaInv, DIM);
+
+            Helper::rotationMatrix2D(hatAij, unitX, LambdaInv);
             //TODO: end block
 
             double vFrotate[DIM];
@@ -676,6 +737,9 @@ void Particles::collectFluxes(Helper &helper){
             double Fv[DIM];
             Fv[0] = Helper::dotProduct(hatAij, vFrotate) + FijGhosts[ii][0]*vFrameGhosts[ii][0];
             Fv[1] = Helper::dotProduct(hatAij, vFrotate) + FijGhosts[ii][0]*vFrameGhosts[ii][1];
+
+            //Fv[0] = vFrotate[0] + FijGhosts[ii][0]*vFrameGhosts[ii][0];
+            //Fv[1] = vFrotate[1] + FijGhosts[ii][0]*vFrameGhosts[ii][1];
 
             vF[i][0] += AijNorm*Fv[0];
             vF[i][1] += AijNorm*Fv[1];
@@ -690,11 +754,11 @@ void Particles::collectFluxes(Helper &helper){
     }
 }
 
-void Particles::updateStateAndPosition(const double &dt){
+void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 
     for(int i=0; i<N; ++i){
 
-        // store velocity for second order position update
+        // store velocity for position update
         double vxi = vx[i], vyi = vy[i];
 #if DIM==3
         double vzi = vz[i];
@@ -734,6 +798,31 @@ void Particles::updateStateAndPosition(const double &dt){
 #else
         u[i] = (Q[0]-.5*m[i]*(vxi*vxi+vyi*vyi))/m[i];
 #endif
+        // MOVE PARTICLES
+        x[i] += .5*(vx[i]+vxi)*dt;
+        y[i] += .5*(vy[i]+vyi)*dt;
+#if DIM==3
+        z[i] += .5*(vz[i]+vzi)*dt;
+#endif
+#if PERIODIC_BOUNDARIES
+        if (x[i] < domain.bounds.minX) {
+            x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
+        } else if (domain.bounds.maxX <= x[i]) {
+            x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
+        }
+        if (y[i] < domain.bounds.minY) {
+            y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
+        } else if (domain.bounds.maxY <= y[i]) {
+            y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
+        }
+#if DIM ==3
+        if (z[i] < domain.bounds.minZ) {
+            z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
+        } else if (domain.bounds.maxZ <= z[i]) {
+            z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
+        }
+#endif
+#endif
     }
 }
 
@@ -772,6 +861,7 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
         // 'corner' particle first if both are true
         if (foundGhostX || foundGhostY) {
             ghostMap[i*(DIM+1)] = iGhost;
+            ghostParticles.parent[iGhost] = i;
             //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
             //          << "ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
             //          << ghostParticles.y[iGhost] << "]";
@@ -787,6 +877,7 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
                 ghostParticles.y[iGhost] = domain.bounds.minY - (domain.bounds.maxY - y[i]);
             }
             ghostMap[i*(DIM+1)+1] = iGhost;
+            ghostParticles.parent[iGhost] = i;
             //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
             //              <<"ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
             //              << ghostParticles.y[iGhost] << "]";
@@ -798,6 +889,7 @@ void Particles::createGhostParticles(Domain &domain, Particles &ghostParticles,
             }
             ghostParticles.y[iGhost] = y[i];
             ghostMap[i*(DIM+1)+2] = iGhost;
+            ghostParticles.parent[iGhost] = i;
             //Logger(DEBUG) << "particle@" << i << " = [" << x[i] << ", " << y[i] << "] makes "
             //              << "ghost@" << iGhost << " = [" << ghostParticles.x[iGhost] << ", "
             //              << ghostParticles.y[iGhost] << "]";
@@ -846,15 +938,9 @@ void Particles::updateGhostGradients(Particles &ghostParticles){
     }
 }
 
-void Particles::updateGhostPsijTilde(Particles &ghostParticles){
+/*void Particles::updateGhostPsijTilde(Particles &ghostParticles){
     for (int i=0; i<N*(DIM+1); ++i){
         if (ghostMap[i] >= 0){
-            // below should not be needed
-            //for(int j=0; j<noi[i]; ++j){
-            //    for (int alpha=0; alpha<DIM; ++alpha){
-            //        ghostParticles.psijTilde_xi[j+ghostMap[i]*MAX_NUM_INTERACTIONS][alpha] = psijTilde_xi[j+i/(DIM+1)*MAX_NUM_INTERACTIONS][alpha];
-            //    }
-            //}
             for (int j=0; j<noiGhosts[i/(DIM+1)]; ++j){
                 for (int alpha=0; alpha<DIM; ++alpha){
                     ghostParticles.psijTilde_xiGhosts[j+ghostMap[i]*MAX_NUM_GHOST_INTERACTIONS][alpha]
@@ -863,7 +949,7 @@ void Particles::updateGhostPsijTilde(Particles &ghostParticles){
             }
         }
     }
-}
+}*/
 
 void Particles::ghostNNS(Domain &domain, const Particles &ghostParticles, const double &kernelSize){
     const double hSqr = kernelSize * kernelSize;
@@ -1130,18 +1216,28 @@ void Particles::gradient(double *f, double (*grad)[DIM], double *fGhost, const P
 
 void Particles::compEffectiveFace(const Particles &ghostParticles){
     for (int i=0; i<N; ++i){
+
+        //Logger(DEBUG) << "      > i = " << i << ", x = [" << x[i] << ", " << y[i] <<
+        //          "], omega = " << omega[i];
+
         for (int j=0; j<noiGhosts[i]; ++j){
-            int ji = nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]; // index i of particle j
-            // search neighbor i in nnlGhosts[] of j
-            int ij = 0;
-            for(ij=0; ij<noiGhosts[ji]; ++ij){
-                for(int iGhost=i*(DIM+1); iGhost<i*(DIM+1)+3; ++iGhost){
-                    if (nnlGhosts[ij+ji*MAX_NUM_GHOST_INTERACTIONS] == ghostMap[iGhost]) break;
-                }
+            int ii = i*MAX_NUM_GHOST_INTERACTIONS+j;
+            int ji = nnlGhosts[ii]; // index i of particle j
+            int ij;
+            for (ij=0; ij<noiGhosts[ghostParticles.parent[ji]]; ++ij){
+                if(ghostParticles.parent[nnlGhosts[ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS]] == i) break;
             }
+
+            //Logger(DEBUG) << "j = " << j << ", ii = " << ii << ", ji = " << ji
+            //          << ", ij = " << ij;
+            //Logger(DEBUG) << "omegaGhost[ji] = " << ghostParticles.omega[ji]
+            //          << ", psijTilde_xiGhost[ii] = [" << psijTilde_xiGhosts[ii][0] << ", " << psijTilde_xiGhosts[ii][1]
+            //          << "], psijTilde_xiGhost[ji] = [" << psijTilde_xiGhosts[ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS][0]
+            //          << ", " << psijTilde_xiGhosts[ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS][1] << "]";
+
             for (int alpha=0; alpha<DIM; ++alpha){
-                AijGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xiGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j][alpha]
-                                                       - 1./ghostParticles.omega[ji]*ghostParticles.psijTilde_xiGhosts[ij+ji*MAX_NUM_GHOST_INTERACTIONS][alpha];
+                AijGhosts[ii][alpha] = 1./omega[i]*psijTilde_xiGhosts[ii][alpha] - 1./ghostParticles.omega[ji]
+                                       * psijTilde_xiGhosts[ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS][alpha];
             }
         }
     }
@@ -1149,6 +1245,7 @@ void Particles::compEffectiveFace(const Particles &ghostParticles){
 
 void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma,
                                   const Particles &ghostParticles){
+
     for (int i=0; i<N; ++i){
         double xij[DIM];
         //double vFrame[DIM];
@@ -1162,8 +1259,11 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xjxi[0] = ghostParticles.x[j] - x[i];
             xjxi[1] = ghostParticles.y[j] - y[i];
 
-            xij[0] = x[i] + kernelSize/2. * (xjxi[0]);
-            xij[1] = y[i] + kernelSize/2. * (xjxi[1]);
+            //xij[0] = x[i] + kernelSize/2. * xjxi[0];
+            //xij[1] = y[i] + kernelSize/2. * xjxi[1];
+
+            xij[0] = x[i] + kernelSize/4. * xjxi[0];
+            xij[1] = y[i] + kernelSize/4. * xjxi[1];
 
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
@@ -1172,7 +1272,8 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xijxj[1] = xij[1] - ghostParticles.y[j];
 #if DIM==3
             xjxi[2] = ghostParticles.z[j] - z[i];
-            xij[2] = z[i] + kernelSize/2. * (xjxi[2]);
+            //xij[2] = z[i] + kernelSize/2. * xjxi[2];
+            xij[2] = z[i] + kernelSize/4. * xjxi[2];
             xijxi[2] = xij[2] - z[i];
             xijxj[2] = xij[2] - ghostParticles.z[j];
 #endif
@@ -1187,17 +1288,17 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             vFrameGhosts[iW][2] = vz[i] + (ghostParticles.vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 
-            /*if(i==4){
-                Logger(DEBUG) << "vFrame[0] = " << vFrame[0]
-                              << ", vFrame[1] = " << vFrame[1]
-                              << ", rhoGrad[i][0] = " << rhoGrad[i][0]
-                              << ", rhoGrad[i][1] = " << rhoGrad[i][1]
-                              << ", rho[i] = " << rho[i]
-                              << ", xijxi = " << xijxi[0] << ", " << xijxi[1]
-                              << ", xij = " << xij[0] << ", " << xij[1]
-                              << ", xj = " << ghostParticles.x[j] << ", " << ghostParticles.y[j] << " @" << j;
-                exit(5);
-            }*/
+            //if(i==95){
+            //    Logger(DEBUG) << "vFrame[0] = " << vFrameGhosts[iW][0]
+            //                  << ", vFrame[1] = " << vFrameGhosts[iW][1]
+                              //<< ", rhoGrad[i][0] = " << rhoGrad[i][0]
+                              //<< ", rhoGrad[i][1] = " << rhoGrad[i][1]
+                              //<< ", rho[i] = " << rho[i]
+            //                  << ", xijxi = [" << xijxi[0] << ", " << xijxi[1]
+            //                  << "], xij = [" << xij[0] << ", " << xij[1]
+            //                  << "], xj = [" << ghostParticles.x[j] << ", " << ghostParticles.y[j] << "] @" << j;
+                //exit(5);
+            //}
             // boost frame to effective face
             WijRGhosts[iW][0] = rho[i];
             WijLGhosts[iW][0] = ghostParticles.rho[j];
@@ -1211,6 +1312,10 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijRGhosts[iW][4] = vz[i] - vFrameGhosts[iW][2];
             WijLGhosts[iW][4] = ghostParticles.vz[j] - vFrameGhosts[iW][2];
 #endif
+
+            //Logger(DEBUG) << "rhoL = " << WijLGhosts[iW][0] << ", rhoR = " << WijRGhosts[iW][0]
+            //              << ", uL = " << WijLGhosts[iW][2] << ", uR = " << WijRGhosts[iW][2]
+            //              << ", PL = " << WijLGhosts[iW][1] << ", PR = " << WijRGhosts[iW][1];
 
             // reconstruction at effective face
             WijRGhosts[iW][0] += Helper::dotProduct(rhoGrad[i], xijxi);
@@ -1245,6 +1350,15 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijLGhosts[iW][4] -= dt/2. * ghostParticles.PGrad[j][2]/rho[j];
 #endif
         }
+    }
+}
+
+/// debugging function to printout the number of (ghost-)interactions
+void Particles::printNoi(){
+    for (int i=0; i<N; ++i) {
+        Logger(DEBUG) << "          > i = " << i << ", x = [" << x[i] << ", " << y[i] <<
+                  "], : noi = " << noi[i] <<
+                  " + " << noiGhosts[i] << " = " << noi[i] + noiGhosts[i];
     }
 }
 
@@ -1291,7 +1405,8 @@ void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
 
 #endif
 
-void Particles::move(const double &dt, Domain &domain){
+// TODO: remove below
+/*void Particles::move(const double &dt, Domain &domain){
 
     for(int i=0; i<N; ++i) {
 
@@ -1325,7 +1440,7 @@ void Particles::move(const double &dt, Domain &domain){
         //Logger(DEBUG) << "                               x[n+1] = ["
         //          << x[i] << ", " << y[i] << "]";
     }
-}
+}*/
 
 /// Sanity check functions
 double Particles::sumVolume(){
@@ -1334,6 +1449,14 @@ double Particles::sumVolume(){
         V += 1./omega[i];
     }
     return V;
+}
+
+double Particles::sumMass(){
+    double M = 0.;
+    for (int i=0; i<N; ++i){
+        M += m[i];
+    }
+    return M;
 }
 
 void Particles::dump2file(std::string filename){
@@ -1349,16 +1472,25 @@ void Particles::dump2file(std::string filename){
 
     // create datasets
     HighFive::DataSet rhoDataSet = h5File.createDataSet<double>("/rho", HighFive::DataSpace(N));
+    HighFive::DataSet mDataSet = h5File.createDataSet<double>("/m", HighFive::DataSpace(N));
+    HighFive::DataSet uDataSet = h5File.createDataSet<double>("/u", HighFive::DataSpace(N));
     HighFive::DataSet posDataSet = h5File.createDataSet<double>("/x", HighFive::DataSpace(dataSpaceDims));
+    HighFive::DataSet velDataSet = h5File.createDataSet<double>("/v", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet rhoGradDataSet = h5File.createDataSet<double>("/rhoGrad", HighFive::DataSpace(dataSpaceDims));
 
     // containers for particle data
     std::vector<double> rhoVec(rho, rho+N);
+    std::vector<double> mVec(m, m+N);
+    std::vector<double> uVec(u, u+N);
+
     std::vector<std::vector<double>> posVec(N);
+    std::vector<std::vector<double>> velVec(N);
+
     std::vector<std::vector<double>> rhoGradVec(N);
 
     // fill containers with data
     std::vector<double> posBuf(DIM);
+    std::vector<double> velBuf(DIM);
     std::vector<double> rhoGradBuf(DIM);
     for(int i=0; i<N; ++i){
         //Logger(DEBUG) << "      > Dumping particle @"  << i;
@@ -1370,6 +1502,14 @@ void Particles::dump2file(std::string filename){
 #endif
         posVec[i] = posBuf;
 
+        // velocity
+        velBuf[0] = vx[i];
+        velBuf[1] = vy[i];
+#if DIM == 3
+        velBuf[2] = vz[i];
+#endif
+        velVec[i] = velBuf;
+
         // density gradient
         rhoGradBuf[0] = rhoGrad[i][0];
         rhoGradBuf[1] = rhoGrad[i][1];
@@ -1380,7 +1520,10 @@ void Particles::dump2file(std::string filename){
     }
     // write data
     rhoDataSet.write(rhoVec);
+    mDataSet.write(mVec);
+    uDataSet.write(uVec);
     posDataSet.write(posVec);
+    velDataSet.write(velVec);
     rhoGradDataSet.write(rhoGradVec);
 }
 

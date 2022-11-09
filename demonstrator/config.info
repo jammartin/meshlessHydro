@@ -5,10 +5,10 @@ initFile ../testcases/kelvin-helmholtz/khN100.h5
 outDir output
 
 ; fixed time step
-timeStep .01
+timeStep .005
 
 ; end of the simulation
-timeEnd .1
+timeEnd .06
 
 ; output particle distribution each h5DumpInterval steps
 h5DumpInterval 10

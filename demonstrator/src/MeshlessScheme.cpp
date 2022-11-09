@@ -42,6 +42,7 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         Logger(DEBUG) << "      > Ghosts NNS";
         particles->ghostNNS(domain, ghostParticles, config.kernelSize);
+        //particles->printNoi();
 #endif
         Logger(INFO) << "    > Computing density";
         particles->compDensity(config.kernelSize);
@@ -50,6 +51,7 @@ void MeshlessScheme::run(){
 #endif
 
         Logger(DEBUG) << "      SANITY CHECK > V_tot = " << particles->sumVolume();
+        Logger(DEBUG) << "      SANITY CHECK > M_tot = " << particles->sumMass();
 
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
@@ -58,8 +60,8 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         particles->updateGhostState(ghostParticles);
         particles->compPsijTilde(helper, ghostParticles, config.kernelSize);
-        Logger(DEBUG) << "      > Updated ghost psij_xiTilde";
-        particles->updateGhostPsijTilde(ghostParticles);
+        //Logger(DEBUG) << "      > Update ghost psij_xiTilde";
+        //particles->updateGhostPsijTilde(ghostParticles);
 
         particles->gradient(particles->rho, particles->rhoGrad, ghostParticles.rho, ghostParticles);
         particles->gradient(particles->vx, particles->vxGrad, ghostParticles.vx, ghostParticles);
@@ -102,6 +104,9 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      > Computing ghost fluxes";
         particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
                                      ghostParticles);
+        //Logger(DEBUG) << "Aborting for debugging.";
+        //exit(6);
+
 #endif
         std::stringstream stepss;
         Logger(INFO) << "   > Dump particle distribution";
@@ -122,19 +127,31 @@ void MeshlessScheme::run(){
         }
 
         Logger(INFO) << "    > Solving Riemann problems";
-        particles->solveRiemannProblems(config.gamma);
+        particles->solveRiemannProblems(config.gamma, ghostParticles);
 
         Logger(INFO) << "    > Collecting fluxes";
-        particles->collectFluxes(helper);
+        particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary
 
         Logger(INFO) << "    > Updating state";
-        particles->updateStateAndPosition(config.timeStep);
+        particles->updateStateAndPosition(config.timeStep, domain);
 
         //Logger(INFO) << "    > Moving particles";
         //particles->move(config.timeStep, domain);
 
         t += config.timeStep;
         ++step;
+
+        // DEBUGGING
+        // TODO: remove
+        //Logger(DEBUG) << "      SANITY CHECK > M_tot = " << particles->sumMass();
+
+        //stepss = std::stringstream();;
+        //Logger(INFO) << "   > Dump particle distribution";
+        //stepss << std::setw(6) << std::setfill('0') << step;
+        //Logger(INFO) << "      > Dump particles to file";
+        //particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+        // END DEBUGGING
+
     } while(t<=config.timeEnd);
 }
 

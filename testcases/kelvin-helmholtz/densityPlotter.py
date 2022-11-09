@@ -14,6 +14,7 @@ def createPlot(h5File, outDir, plotGrad, iNNL):
     rho = data["rho"][()]
     fig, ax = plt.subplots(figsize=(8,6), dpi=200)
     rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.) # good for ~100 particles
+    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=125.) # good for ~400 particles
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.) # good for 10**4 particles
     if "Ghosts" not in str(h5File):
         ax.set_xlim((-.75, .75))
@@ -38,7 +39,7 @@ def createPlot(h5File, outDir, plotGrad, iNNL):
     #plt.show()
 
 def plotGradient(grad, pos, ax):
-    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=10.)
+    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=100.)
     #ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale=.01)
     
     #for i, rhoGrad in enumerate(grad):

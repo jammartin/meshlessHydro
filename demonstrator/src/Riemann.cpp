@@ -15,6 +15,8 @@ Riemann::Riemann(double *WR, double *WL, double Aij[DIM]) : WR { WR }, WL { WL }
     hatAij[2] = 1./AijNorm*Aij[2];
 #endif
 
+    //Logger(DEBUG) << "Aij = [" << Aij[0] << ", " << Aij[1] << "], AijNorm = " << AijNorm;
+
     // compute norm of velocity
     double unitX[DIM] = { 1, 0
 #if DIM==3
@@ -46,6 +48,15 @@ void Riemann::exact(double *Fij, const double &gamma){
 
     solver.solve(WL[0], WL[2], WL[1], WR[0], WR[2], WR[1],
                  Fij[0], Fij[2], Fij[1]);
+    Fij[3] = 0.; // explicitly setting vy flux to zero
+
+    //Logger(DEBUG) << "Fij = [" << Fij[0] << " (mass), " << Fij[2] << " (vx), "
+    //          << Fij[3] << " (vy), " << Fij[1] << " (energy)]";
+
+    /// CONVERT SOLUTION TO FLUXES
+    Fij[0] = Fij[0]*Fij[2];
+    Fij[1] = Fij[2]*(.5*Fij[0]*Fij[2]*Fij[2]+Fij[1]/((gamma-1.)*Fij[0]) + Fij[1]);
+    Fij[2] = Fij[0]*(Fij[2]*Fij[2]+Fij[1]);
 }
 
 

@@ -45,11 +45,11 @@ public:
 
     void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma);
 
-    void solveRiemannProblems(const double &gamma);
+    void solveRiemannProblems(const double &gamma, const Particles &ghostParticles);
 
-    void collectFluxes(Helper &helper);
+    void collectFluxes(Helper &helper, const Particles &ghostParticles);
 
-    void updateStateAndPosition(const double &dt);
+    void updateStateAndPosition(const double &dt, const Domain &domain);
 
 
 #if PERIODIC_BOUNDARIES
@@ -65,19 +65,22 @@ public:
 
     /// functions to copy computed quantities to ghosts needed for further processing
     void updateGhostState(Particles &ghostParticles);
-    void updateGhostPsijTilde(Particles &ghostParticles);
+    //void updateGhostPsijTilde(Particles &ghostParticles);
     void updateGhostGradients(Particles &ghostParticles);
 
     void dumpNNL(std::string filename, const Particles &ghostParticles);
+
+    void printNoi();
 
 
 #endif
 
     /// function to move particles for testing purposes
-    void move(const double &dt, Domain &domain);
+    //void move(const double &dt, Domain &domain); // TODO: remove
 
     /// sanity check functions
     double sumVolume();
+    double sumMass();
 
     void dump2file(std::string filename);
 
@@ -110,6 +113,7 @@ private:
     double (*FijGhosts)[DIM+2];
     double (*vFrameGhosts)[DIM];
     int *ghostMap;
+    int *parent; // if class holds ghost particles the parent node is stored
 #endif
 
     /// Helper variables for gradient estimation

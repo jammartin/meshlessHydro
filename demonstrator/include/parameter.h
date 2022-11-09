@@ -12,11 +12,11 @@
 #define PERIODIC_BOUNDARIES 1
 
 /// maximum number of interactions for each particle
-#define MAX_NUM_INTERACTIONS 800
+#define MAX_NUM_INTERACTIONS 100
 /** maximum interactions with ghost particles
  *  ignored when `PERIODIC_BOUNDARIES` is not set
 **/
-#define MAX_NUM_GHOST_INTERACTIONS 500
+#define MAX_NUM_GHOST_INTERACTIONS 100
 
 /// define verbosity for each VERBOSITY_PARTICLES particles
 #define VERBOSITY_PARTICLES 10
