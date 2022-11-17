@@ -27,7 +27,15 @@ public:
 
 private:
     double *WR, *WL, *Aij, *Fij;
-    double AijNorm, hatAij[DIM], Lambda[DIM*DIM];
+    double rhoSol, vSol[DIM], PSol;
+    double AijNorm, hatAij[DIM];
+    double unitX[DIM] = { 1, 0
+#if DIM==3
+            ,0
+#endif
+    };
+
+    void rotateAndProjectFluxes2D(double *Fij, const double &gamma);
 
 };
 

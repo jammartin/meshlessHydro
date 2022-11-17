@@ -95,8 +95,8 @@ int main(int argc, char *argv[]){
 
     Logger(INFO) << "... done.";
 
-    Logger(INFO) << "Starting time integration.";
+    Logger(INFO) << "Starting time integration ...";
     algorithm.run();
-    Logger(INFO) << "Finished!";
+    Logger(INFO) << "... done.";
     return 0;
 }

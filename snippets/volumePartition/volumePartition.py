@@ -76,7 +76,7 @@ if __name__=="__main__":
     cmap_b = mplc.LinearSegmentedColormap.from_list('b_cmap',[c_white_trans,c_blue],512)
     cmap_g = mplc.LinearSegmentedColormap.from_list('g_cmap',[c_white_trans,c_green],512)
 
-    plt.figure(figsize=(8,6), dpi=200)
+    plt.figure(figsize=(6,6), dpi=200)
     
     # plot real cells
     plt.contourf(xv, yv, psiv[0], levels=100, cmap=cmap_r)

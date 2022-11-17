@@ -23,7 +23,7 @@ void MeshlessScheme::run(){
     int step = 0;
 
     do {
-        Logger(INFO) << "  > TIME: " << t;
+        Logger(INFO) << "  > TIME: " << t << ", STEP: " << step;
         Logger(INFO) << "    > Assigning particles ...";
         particles->assignParticlesAndCells(domain);
         Logger(INFO) << "    > ... done.";
@@ -73,11 +73,13 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      > Update ghost gradients";
         particles->updateGhostGradients(ghostParticles);
 
+#if SLOPE_LIMITING
         // TODO: Check slope limiter
-        //Logger(DEBUG) << "      > Limiting slopes";
-        //particles->slopeLimiter(config.kernelSize, &ghostParticles);
-        //Logger(DEBUG) << "      > Update limited ghost gradients";
-        //particles->updateGhostGradients(ghostParticles);
+        Logger(DEBUG) << "      > Limiting slopes";
+        particles->slopeLimiter(config.kernelSize, &ghostParticles);
+        Logger(DEBUG) << "      > Update limited ghost gradients";
+        particles->updateGhostGradients(ghostParticles);
+#endif
 #else
         particles->compPsijTilde(helper, config.kernelSize);
         particles->gradient(particles->rho, particles->rhoGrad);
@@ -87,9 +89,11 @@ void MeshlessScheme::run(){
         particles->gradient(particles->vz, particles->vzGrad);
 #endif
         particles->gradient(particles->P, particles->PGrad);
+#if SLOPE_LIMITING
         // TODO: check how to properly limit gradiens
-        //Logger(DEBUG) << "      > Limiting slopes";
-        //particles->slopeLimiter(config.kernelSize);
+        Logger(DEBUG) << "      > Limiting slopes";
+        particles->slopeLimiter(config.kernelSize);
+#endif
 #endif
         Logger(INFO) << "    > Preparing Riemann solver";
         Logger(DEBUG) << "      > Computing effective faces";
@@ -117,12 +121,12 @@ void MeshlessScheme::run(){
 #if PERIODIC_BOUNDARIES
         Logger(INFO) << "      > Dump ghosts to file";
         ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
-        Logger(INFO) << "      > Dump NNL to file";
-        particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
+        //Logger(INFO) << "      > Dump NNL to file";
+        //particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif
 
         if (t>=config.timeEnd){
-            Logger(INFO) << "  > FINISHED!";
+            Logger(INFO) << "    > t = " << t << " -> FINISHED!";
             break;
         }
 
@@ -140,6 +144,8 @@ void MeshlessScheme::run(){
 
         t += config.timeStep;
         ++step;
+        //Logger(DEBUG) << "    > t = " << t << ", step =  " << step
+        //          << ", t_end = " << config.timeEnd;
 
         // DEBUGGING
         // TODO: remove
@@ -152,7 +158,7 @@ void MeshlessScheme::run(){
         //particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
         // END DEBUGGING
 
-    } while(t<=config.timeEnd);
+    } while(t<config.timeEnd+config.timeStep);
 }
 
 MeshlessScheme::~MeshlessScheme(){}

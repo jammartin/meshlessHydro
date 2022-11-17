@@ -21,7 +21,13 @@
 /// define verbosity for each VERBOSITY_PARTICLES particles
 #define VERBOSITY_PARTICLES 10
 
-/// slope limiting parameter
+/// flag for slope limiting, 0: no slope limiting
+#define SLOPE_LIMITING 1
+
+/// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
 #define BETA 1.
+
+/// use first order quadrature point for Riemann problems
+#define FIRST_ORDER_QUAD_POINT 0
 
 #endif //DEMONSTRATOR_PARAMETER_H

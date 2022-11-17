@@ -11,14 +11,22 @@ import matplotlib.pyplot as plt
 def createPlot(h5File, outDir, plotGrad, iNNL):
     data = h5.File(h5File, 'r')
     pos = data["x"][:]
+    
     rho = data["rho"][()]
+    #P = data["P"][()] 
     fig, ax = plt.subplots(figsize=(8,6), dpi=200)
-    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.) # good for ~100 particles
-    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=125.) # good for ~400 particles
+    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.) # good for ~100 particles
+    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=200.) # good for ~400 particles
+    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=100.) # good for ~900 particles
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.) # good for 10**4 particles
+
+    #PPlt = ax.scatter(pos[:,0], pos[:,1], c=P, s=200.) # good for ~400 particles
+    
     if "Ghosts" not in str(h5File):
-        ax.set_xlim((-.75, .75))
-        ax.set_ylim((-.75, .75))
+        #ax.set_xlim((-.75, .75))
+        #ax.set_ylim((-.75, .75))
+        ax.set_xlim((-.6, .6))
+        ax.set_ylim((-.6, .6))
     
     # Plot gradient
     if plotGrad:
@@ -29,7 +37,9 @@ def createPlot(h5File, outDir, plotGrad, iNNL):
         plotNNL(h5File, iNNL, pos, ax)
         
     fig.colorbar(rhoPlt, ax=ax)
+    #fig.colorbar(PPlt, ax=ax)
     plt.title(r"Color coded density $\rho$")
+    #plt.title(r"Color coded pressure $P$")
     plt.xlabel("$x$")
     plt.ylabel("$y$")
     plt.tight_layout()
@@ -52,13 +62,37 @@ def plotNNL(h5File, iNNL, pos, ax):
     ax.scatter(pos[iNNL,0], pos[iNNL,1], s=50., marker='x', color='b')
     ax.scatter(posNNL[:,0], posNNL[:,1], s=50, marker='x', color='r')
 
+def createPressurePlot(h5File, outDir):
+    data = h5.File(h5File, 'r')
+    pos = data["x"][:]
+    
+    P = data["P"][()] 
+    fig, ax = plt.subplots(figsize=(8,6), dpi=200)
+    PPlt = ax.scatter(pos[:,0], pos[:,1], c=P, s=100.) # good for ~900 particles
+    
+    if "Ghosts" not in str(h5File):
+        #ax.set_xlim((-.75, .75))
+        #ax.set_ylim((-.75, .75))
+        ax.set_xlim((-.6, .6))
+        ax.set_ylim((-.6, .6))
+       
+    fig.colorbar(PPlt, ax=ax)
+    plt.title(r"Color coded pressure $P$")
+    plt.xlabel("$x$")
+    plt.ylabel("$y$")
+    plt.tight_layout()
+    print("Saving figure to", outDir + "/P" + pathlib.Path(h5File).stem + ".png")
+    plt.savefig(outDir + "/P" + pathlib.Path(h5File).stem + ".png")
+    plt.close()
+
    
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description="Plot density of results from Kelvin-Helmholtz test case.")
     parser.add_argument("--simOutputDir", "-d", metavar="string", type=str, help="output directory of simulation", required=True)
     parser.add_argument("--outDir", "-o", metavar="string", type=str, help="output directory for generated plots", default="output")
-    parser.add_argument("--plotGradient", "-g", action="store_true")
-    parser.add_argument("--plotGhosts", "-G", action="store_true")
+    parser.add_argument("--plotGradient", "-g", action="store_true", help="plot density gradients")
+    parser.add_argument("--plotGhosts", "-G", action="store_true", help="also plot ghost cells in an extra file")
+    parser.add_argument("--pressure", "-P", action="store_true", help="plot pressure instead of density")
     parser.add_argument("--iNNL", "-i", metavar="int", type=int, help="plot NNL for particles i", default=-1)
 
     args = parser.parse_args()
@@ -71,7 +105,13 @@ if __name__=="__main__":
         if "NNL" not in str(h5File):
             if args.plotGhosts or not "Ghost" in str(h5File): 
                 print("\t", h5File)
-                createPlot(h5File, args.outDir, args.plotGradient, args.iNNL)
+                if args.pressure:
+                    if args.plotGradient or args.iNNL > -1:
+                        print("WARNING: command line arguments --plotGradient and --iNNL are ignored when plotting pressure.")
+                    createPressurePlot(h5File, args.outDir)
+                else:
+                    createPlot(h5File, args.outDir, args.plotGradient, args.iNNL)
+            
 
     print("... done.")
     

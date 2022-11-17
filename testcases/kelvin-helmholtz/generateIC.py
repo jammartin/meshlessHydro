@@ -18,12 +18,11 @@ dvy0 = .01
 
 def getVelsX(y):
     velsX = np.empty(len(y))
-    
     mask1 = y<.25
     velsX[mask1] = -.5+.5*np.exp((y[mask1]-.25)/Dy)
     mask2 = (.25<=y) & (y<.5)
     velsX[mask2] = .5-.5*np.exp((.25-y[mask2])/Dy)
-    mask3 = (.5<=y) & (y<.75)
+    mask3 = (.5<=y) & (y<=.75)
     velsX[mask3] = .5-.5*np.exp((y[mask3]-.75)/Dy)
     mask4 = .75<y
     velsX[mask4] = -.5-.5*np.exp((.75-y[mask4])/Dy)
@@ -43,9 +42,9 @@ def getDensities(y):
     densities[mask1] = rho2-Drho*np.exp((y[mask1]-.25)/Dy)
     mask2 = (.25<=y) & (y<.5)
     densities[mask2] = rho1+Drho*np.exp((.25-y[mask2])/Dy)
-    mask3 = (.5<=y) & (y<.75)
+    mask3 = (.5<=y) & (y<=.75)
     densities[mask3] = rho1+Drho*np.exp((y[mask3]-.75)/Dy)
-    mask4 = .75<=y
+    mask4 = .75<y
     densities[mask4] = rho2-Drho*np.exp((.75-y[mask4])/Dy)
 
     return densities
@@ -96,7 +95,7 @@ if __name__=="__main__":
     # volume is 1
     m = rho/N
     # create specific internal energy
-    u = P/((gamma-1.)*rho)
+    u = P/((gamma-1.)*rho) #-.5*np.linalg.norm(vel, axis=1)**2.
 
     pos = pos - [.5, .5] # transform for symmetry around origin
     
