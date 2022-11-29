@@ -374,7 +374,7 @@ void Particles::slopeLimiter(const double &kernelSize,
 void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kernelSize,
                              Particles *ghostParticles, double *fGhost){
     double xij[DIM], xijxi[DIM];
-    Logger(DEBUG) << "#################### NEXT GRADIENT ####################";
+    //Logger(DEBUG) << "#################### NEXT GRADIENT ####################";
 
     for (int i=0; i<N; ++i){
         double psiMaxNgb { std::numeric_limits<double>::min() };
@@ -455,16 +455,16 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
         //}
 
         if (alphaMin <= alphaMax && BETA*alphaMin < 1.){
-            Logger(DEBUG) << "        > Limiting gradient with alphaMin@" << i << ", alpha = "
-                          << alphaMin << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
+            //Logger(DEBUG) << "        > Limiting gradient with alphaMin@" << i << ", alpha = "
+            //              << alphaMin << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
             grad[i][0] *= alphaMin;
             grad[i][1] *= alphaMin;
 #if DIM==3
             grad[i][2] *= alphaMin;
 #endif
         } else if (alphaMax <= alphaMin && BETA*alphaMax < 1.){
-            Logger(DEBUG) << "        > Limiting gradient with alphaMax@" << i << ", alpha = "
-                        << alphaMax << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
+            //Logger(DEBUG) << "        > Limiting gradient with alphaMax@" << i << ", alpha = "
+            //            << alphaMax << ", grad[0] = " << grad[i][0] << ", grad[1] = " << grad[i][1];
             grad[i][0] *= alphaMax;
             grad[i][1] *= alphaMax;
 #if DIM==3
@@ -493,16 +493,24 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
 #if FIRST_ORDER_QUAD_POINT
             xij[0] = (x[i] + x[j])/2.;
             xij[1] = (y[i] + y[j])/2.;
+
+            xijxj[0] = .5*(x[i] - x[j]);
+            xijxj[1] = .5*(y[i] - y[j]);
+
+            xijxi[0] = .5*(x[j] - x[i]);
+            xijxi[1] = .5*(y[j] - y[i]);
+
 #else
             xij[0] = x[i] + kernelSize/4. * xjxi[0];
             xij[1] = y[i] + kernelSize/4. * xjxi[1];
-#endif
 
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 
             xijxj[0] = xij[0] - x[j];
             xijxj[1] = xij[1] - y[j];
+#endif
+
 #if DIM==3
             xjxi[2] = z[j] - z[i];
             //xij[2] = z[i] + kernelSize/2. * xjxi[2];
@@ -513,15 +521,24 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xijxj[2] = xij[2] - z[j];
             // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
-            double dotProd = Helper::dotProduct(xijxi, xjxi);
-            double dSqr = Helper::dotProduct(xjxi, xjxi);
 
             int iW = i*MAX_NUM_INTERACTIONS+jn;
+
+#if FIRST_ORDER_QUAD_POINT
+            vFrame[iW][0] = (vx[i] + vx[j])/2.;
+            vFrame[iW][1] = (vy[i] + vy[j])/2.;
+#if DIM==3
+            vFrame[iW][2] = (vz[i] + vz[j])/2.;
+#endif
+#else
+            double dotProd = Helper::dotProduct(xijxi, xjxi);
+            double dSqr = Helper::dotProduct(xjxi, xjxi);
 
             vFrame[iW][0] = vx[i] + (vx[j]-vx[i]) * dotProd/dSqr;
             vFrame[iW][1] = vy[i] + (vy[j]-vy[i]) * dotProd/dSqr;
 #if DIM==3
             vFrame[iW][2] = vz[i] + (vz[j]-vz[i]) * dotProd/dSqr;
+#endif
 #endif
             // boost frame to effective face
             WijR[iW][0] = rho[i];
@@ -537,26 +554,26 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijL[iW][4] = vz[j] - vFrame[iW][2];
 #endif
 
-            //if (i == 9 && j == 6){
-            //    Logger(DEBUG) << "        j = " << j
-            //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
-            //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
-            //                  << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1];
-            //}
+            if (i == 46){// && jn == 28){
+                Logger(DEBUG) << "        j = " << j
+                              << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
+                              << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
+                              << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1];
+            }
 
-            //if(i==9 && j == 6){
-                //Logger(DEBUG) << "vFrame[iW] = [" << vFrame[iW][0]
-                //            << ", " << vFrame[iW][1] << "]"
-                //            << ", rhoGrad[i] = [" << rhoGrad[i][0]
-                //            << ", " << rhoGrad[i][1] << "]"
-            //    Logger(DEBUG) << "PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
-            //                << "], PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
-                            //<< "], rho[i] = " << rho[i]
-            //                << "], xijxi = [" << xijxi[0] << ", " << xijxi[1]
-            //                << "], xijxj = [" << xijxj[0] << ", " << xijxj[1] << "]";
-                            //<< "], xj = [" << x[j] << ", " << x[j] << "] @" << j;
+            if(i == 46){// && jn == 28){
+                Logger(DEBUG) << "vFrame[iW] = [" << vFrame[iW][0]
+                            << ", " << vFrame[iW][1] << "]"
+                            << ", rhoGrad[i] = [" << rhoGrad[i][0]
+                            << ", " << rhoGrad[i][1] << "]";
+                Logger(DEBUG) << "PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
+                            << "], PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
+                            << "], rho[i] = " << rho[i]
+                //            << "], xijxi = [" << xijxi[0] << ", " << xijxi[1]
+                //            << "], xijxj = [" << xijxj[0] << ", " << xijxj[1] << "]";
+                            << ", xj = [" << x[j] << ", " << x[j] << "] @" << j;
                 //exit(5);
-            //}
+            }
             // reconstruction at effective face
             WijR[iW][0] += Helper::dotProduct(rhoGrad[i], xijxi);
             WijL[iW][0] += Helper::dotProduct(rhoGrad[j], xijxj);
@@ -571,7 +588,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijL[iW][4] += Helper::dotProduct(vzGrad[j], xijxj);
 #endif
 
-            //if (i == 9 && j == 6){
+            //if (i == 23 && jn == 28){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
             //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
@@ -585,20 +602,21 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             viDiv += vzGrad[i][2];
             vjDiv += vzGrad[j][2];
 #endif
-            WijR[iW][0] -= dt/2. * rho[i] * viDiv;
-            WijL[iW][0] -= dt/2. * rho[j] * vjDiv;
-            WijR[iW][1] -= dt/2. * gamma*P[i] * viDiv;
-            WijL[iW][1] -= dt/2. * gamma*P[j] * vjDiv;
-            WijR[iW][2] -= dt/2. * PGrad[i][0]/rho[i];
-            WijL[iW][2] -= dt/2. * PGrad[j][0]/rho[j];
-            WijR[iW][3] -= dt/2. * PGrad[i][1]/rho[i];
-            WijL[iW][3] -= dt/2. * PGrad[j][1]/rho[j];
+            WijR[iW][0] -= dt/2. * (rho[i] * viDiv + (vx[i]-vFrame[iW][0])*rhoGrad[i][0] + (vy[i]-vFrame[iW][1])*rhoGrad[i][1]);
+            WijL[iW][0] -= dt/2. * (rho[j] * vjDiv + (vx[j]-vFrame[iW][0])*rhoGrad[j][0] + (vy[j]-vFrame[iW][1])*rhoGrad[j][1]);
+            WijR[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrame[iW][0])*PGrad[i][0] + (vy[i]-vFrame[iW][1])*PGrad[i][1]);
+            WijL[iW][1] -= dt/2. * (gamma*P[j] * vjDiv + (vx[j]-vFrame[iW][0])*PGrad[j][0] + (vy[j]-vFrame[iW][1])*PGrad[j][1]);
+            // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff)
+            WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*viDiv);
+            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vjDiv);
+            WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vy[i]-vFrame[iW][1])*viDiv);
+            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vy[j]-vFrame[iW][1])*vjDiv);
 #if DIM==3
             WijR[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
             WijL[iW][4] -= dt/2. * PGrad[j][2]/rho[j];
 #endif
 
-            //if (i == 9 && j == 6){
+            //if (i == 6){// && jn == 28){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
             //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
@@ -621,11 +639,17 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 
         for (int j=0; j<noi[i]; ++j){
             int ii = i*MAX_NUM_INTERACTIONS+j; // interaction index
-            //if (i == 394 && nnl[ii] == 373){
-            //    Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", j = " << nnl[ii];
-            //    Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
-            //                  << x[nnl[ii]] << ", " << y[nnl[ii]] << "]";
-            //    Logger(DEBUG) << "vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+            //if (i == 9 && j == 11){
+                //Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", j = " << nnl[ii];
+                //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
+                //              << x[nnl[ii]] << ", " << y[nnl[ii]] << "] , vi = ["
+                //              << vx[i] << ", " << vy[i] << "], vj = ["
+                //              << vx[nnl[ii]] << ", " << vy[nnl[ii]] << "]";
+                //Logger(DEBUG) << "vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+                //Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
+                //              << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
+                //              << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
+                //              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
             //}
 
             //Logger(DEBUG) << "*WR = " << WijR[ii] << ", *WL = " << WijL[ii];
@@ -635,13 +659,18 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                 Logger(WARN) << "Negative pressure encountered@(i = " << i << ", j = " << j << ") Very bad :( !!";
                 Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
                               << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
-                              << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1];
+                              << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
+                              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
             }
 
-            Riemann solver { WijR[ii], WijL[ii], Aij[ii] };
+            Riemann solver { WijR[ii], WijL[ii], Aij[ii] , i };
             solver.exact(Fij[ii], gamma);
+
+            //if(i == 6){//&& j==11){
+            //    Logger(DEBUG) << "Fluxes = [" << Fij[ii][0] << ", " << Fij[ii][1] << ", " << Fij[ii][2] << ", " << Fij[ii][3] << "]";
+            //}
         }
 
 #if PERIODIC_BOUNDARIES
@@ -661,7 +690,7 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                 exit(6);
             }
 
-            Riemann solver { WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii] };
+            Riemann solver { WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii], i };
             solver.exact(FijGhosts[ii], gamma);
         }
 #endif
@@ -707,6 +736,13 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
             eF[i] += AijNorm*(Fij[ii][1] + .5*Helper::dotProduct(vFrame[ii], vFrame[ii])*Fij[ii][0]
                               + Helper::dotProduct(vFrame[ii], Fv));
 
+            if (i == 46){
+                Logger(DEBUG) << "  > j = " << nnl[ii];
+                Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
+                              << "], Fe = " << eF[i]
+                << ", vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+            }
+
         }
 
 #if PERIODIC_BOUNDARIES
@@ -735,6 +771,13 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
             Fv[1] = FijGhosts[ii][3];
             eF[i] += AijNorm*(FijGhosts[ii][1] + .5*Helper::dotProduct(vFrameGhosts[ii], vFrameGhosts[ii])*FijGhosts[ii][0]
                               + Helper::dotProduct(vFrameGhosts[ii], Fv));
+
+            if (i == 46){
+                Logger(DEBUG) << "  > jGhost = " << nnlGhosts[ii];
+                Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
+                              << "], Fe = " << eF[i]
+                << ", vFrame = [" << vFrameGhosts[ii][0] << ", " << vFrameGhosts[ii][1] << "]";
+            }
         }
 #endif
     }
@@ -753,15 +796,19 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         // create state vector without mass
         double Q[DIM+1];
 #if DIM==3
-        Q[0] = m[i]*u[i] + .5*m[i]*(vxi*vxi+vyi*vyi+vzi*vzi);
+        Q[0] = m[i]*(u[i] + .5*(vxi*vxi+vyi*vyi+vzi*vzi));
 #else
-        Q[0] = m[i]*u[i] + .5*m[i]*(vxi*vxi+vyi*vyi);
+        Q[0] = m[i]*(u[i] + .5*(vxi*vxi+vyi*vyi));
 #endif
         Q[1] = m[i]*vxi;
         Q[2] = m[i]*vyi;
 #if DIM==3
         Q[3] = m[i]*vzi;
 #endif
+        if(i == 46){
+            Logger(DEBUG) << "i = " << i << ", mass flux = " << mF[i]
+                          << ", momentum flux = [" << vF[i][0] << ", " << vF[i][1] << "], energy flux = " << eF[i];
+        }
 
         // UPDATE MASS
         m[i] -= dt*mF[i];
@@ -1255,16 +1302,23 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
 #if FIRST_ORDER_QUAD_POINT
             xij[0] = (x[i] + ghostParticles.x[j])/2.;
             xij[1] = (y[i] + ghostParticles.y[j])/2.;
+
+            xijxj[0] = .5*(x[i] - ghostParticles.x[j]);
+            xijxj[1] = .5*(y[i] - ghostParticles.y[j]);
+
+            xijxi[0] = .5*(ghostParticles.x[j] - x[i]);
+            xijxi[1] = .5*(ghostParticles.y[j] - y[i]);
+
 #else
             xij[0] = x[i] + kernelSize/4. * xjxi[0];
             xij[1] = y[i] + kernelSize/4. * xjxi[1];
-#endif
-
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 
             xijxj[0] = xij[0] - ghostParticles.x[j];
             xijxj[1] = xij[1] - ghostParticles.y[j];
+#endif
+
 #if DIM==3
             xjxi[2] = ghostParticles.z[j] - z[i];
             //xij[2] = z[i] + kernelSize/2. * xjxi[2];
@@ -1273,17 +1327,25 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             xijxj[2] = xij[2] - ghostParticles.z[j];
             // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
-            double dotProd = Helper::dotProduct(xijxi, xjxi);
-            double dSqr = Helper::dotProduct(xjxi, xjxi);
 
             int iW = i*MAX_NUM_GHOST_INTERACTIONS+jn;
+
+#if FIRST_ORDER_QUAD_POINT
+            vFrameGhosts[iW][0] = (vx[i] + ghostParticles.vx[j])/2.;
+            vFrameGhosts[iW][1] = (vy[i] + ghostParticles.vy[j])/2.;
+#if DIM==3
+            vFrameGhosts[iW][2] = (vz[i] + ghostParticles.vz[j])/2.;
+#endif
+#else
+            double dotProd = Helper::dotProduct(xijxi, xjxi);
+            double dSqr = Helper::dotProduct(xjxi, xjxi);
 
             vFrameGhosts[iW][0] = vx[i] + (ghostParticles.vx[j]-vx[i]) * dotProd/dSqr;
             vFrameGhosts[iW][1] = vy[i] + (ghostParticles.vy[j]-vy[i]) * dotProd/dSqr;
 #if DIM==3
             vFrameGhosts[iW][2] = vz[i] + (ghostParticles.vz[j]-vz[i]) * dotProd/dSqr;
 #endif
-
+#endif
             /*if(i == 394){
                 Logger(DEBUG) << "vFrame[0] = " << vFrameGhosts[iW][0]
                               << ", vFrame[1] = " << vFrameGhosts[iW][1]
@@ -1323,7 +1385,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijLGhosts[iW][4] += Helper::dotProduct(ghostParticles.vzGrad[j], xijxj);
 #endif
 
-            //if (i == 394){
+            //if (i == 23 && iW == 28){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijLGhosts[iW][0] << ", rhoR = " << WijRGhosts[iW][0]
             //                  << ", uL = " << WijLGhosts[iW][2] << ", uR = " << WijRGhosts[iW][2]
@@ -1337,18 +1399,26 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             viDiv += vzGrad[i][2];
             vjDiv += ghostParticles.vzGrad[j][2];
 #endif
-            WijRGhosts[iW][0] -= dt/2. * rho[i] * viDiv;
-            WijLGhosts[iW][0] -= dt/2. * ghostParticles.rho[j] * vjDiv;
-            WijRGhosts[iW][1] -= dt/2. * gamma*P[i] * viDiv;
-            WijLGhosts[iW][1] -= dt/2. * gamma*ghostParticles.P[j] * vjDiv;
-            WijRGhosts[iW][2] -= dt/2. * PGrad[i][0]/rho[i];
-            WijLGhosts[iW][2] -= dt/2. * ghostParticles.PGrad[j][0]/rho[j];
-            WijRGhosts[iW][3] -= dt/2. * PGrad[i][1]/rho[i];
-            WijLGhosts[iW][3] -= dt/2. * ghostParticles.PGrad[j][1]/rho[j];
+            WijRGhosts[iW][0] -= dt/2. * (rho[i] * viDiv + (vx[i]-vFrameGhosts[iW][0])*rhoGrad[i][0] + (vy[i]-vFrameGhosts[iW][1])*rhoGrad[i][1]);
+            WijLGhosts[iW][0] -= dt/2. * (ghostParticles.rho[j] * vjDiv + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.rhoGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.rhoGrad[j][1]);
+            WijRGhosts[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrameGhosts[iW][0])*PGrad[i][0] + (vy[i]-vFrameGhosts[iW][1])*PGrad[i][1]);
+            WijLGhosts[iW][1] -= dt/2. * (gamma*ghostParticles.P[j] * vjDiv + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.PGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.PGrad[j][1]);
+            WijRGhosts[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i] - vFrameGhosts[iW][0])*viDiv);
+            WijLGhosts[iW][2] -= dt/2. * (ghostParticles.PGrad[j][0]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*vjDiv);
+            WijRGhosts[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vy[i] - vFrameGhosts[iW][1])*viDiv);
+            WijLGhosts[iW][3] -= dt/2. * (ghostParticles.PGrad[j][1]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*vjDiv);
 #if DIM==3
             WijRGhosts[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
-            WijLGhosts[iW][4] -= dt/2. * ghostParticles.PGrad[j][2]/rho[j];
+            WijLGhosts[iW][4] -= dt/2. * ghostParticles.PGrad[j][2]/ghostParticles.rho[j];
 #endif
+
+           //if (i == 46) // && iW == 28){
+           //     Logger(DEBUG) << "        j = " << j
+           //                   << ", rhoL = " << WijLGhosts[iW][0] << ", rhoR = " << WijRGhosts[iW][0]
+           //                   << ", uL = " << WijLGhosts[iW][2] << ", uR = " << WijRGhosts[iW][2]
+           //                   << ", PL = " << WijLGhosts[iW][1] << ", PR = " << WijRGhosts[iW][1];
+            //}
+
         }
     }
 }

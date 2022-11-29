@@ -25,9 +25,9 @@
 #define SLOPE_LIMITING 1
 
 /// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
-#define BETA 1.
+#define BETA 4.
 
 /// use first order quadrature point for Riemann problems
-#define FIRST_ORDER_QUAD_POINT 0
+#define FIRST_ORDER_QUAD_POINT 1
 
 #endif //DEMONSTRATOR_PARAMETER_H

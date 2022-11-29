@@ -25,7 +25,7 @@ def getVelsX(y):
     mask3 = (.5<=y) & (y<=.75)
     velsX[mask3] = .5-.5*np.exp((y[mask3]-.75)/Dy)
     mask4 = .75<y
-    velsX[mask4] = -.5-.5*np.exp((.75-y[mask4])/Dy)
+    velsX[mask4] = -.5+.5*np.exp((.75-y[mask4])/Dy)
 
     return velsX
 

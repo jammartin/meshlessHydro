@@ -112,19 +112,20 @@ void MeshlessScheme::run(){
         //exit(6);
 
 #endif
-        std::stringstream stepss;
-        Logger(INFO) << "   > Dump particle distribution";
-        stepss << std::setw(6) << std::setfill('0') << step;
-        Logger(INFO) << "      > Dump particles to file";
-        particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+        if (step % config.h5DumpInterval == 0) {
+            std::stringstream stepss;
+            Logger(INFO) << "   > Dump particle distribution";
+            stepss << std::setw(6) << std::setfill('0') << step;
+            Logger(INFO) << "      > Dump particles to file";
+            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 
 #if PERIODIC_BOUNDARIES
-        Logger(INFO) << "      > Dump ghosts to file";
-        ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
-        //Logger(INFO) << "      > Dump NNL to file";
-        //particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
+            Logger(INFO) << "      > Dump ghosts to file";
+            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+            Logger(INFO) << "      > Dump NNL to file";
+            particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif
-
+        }
         if (t>=config.timeEnd){
             Logger(INFO) << "    > t = " << t << " -> FINISHED!";
             break;

@@ -1,17 +1,17 @@
 ; h5 file containing the initial particle distribution
-initFile ../testcases/kelvin-helmholtz/khN900.h5
+initFile ../testcases/kelvin-helmholtz/khN400.h5
 
 ; output directory for particle distribution h5 files
 outDir output
 
 ; fixed time step
-timeStep .005
+timeStep .001
 
 ; end of the simulation
 timeEnd .5
 
 ; output particle distribution each h5DumpInterval steps
-h5DumpInterval 10
+h5DumpInterval 5
 
 ; periodic boundaries of box
 ; ignored when PERIODIC_BOUNDARIES is not set in parameter.h
@@ -26,7 +26,7 @@ periodicBoxLimits {
 
 // TODO: this is implemented as half the kernel size
 ; kernel size for meshless scheme
-kernelSize .14
+kernelSize .11
 
 ; adiabatic index
 gamma 1.6666666666666667

@@ -4,7 +4,7 @@
 
 #include "../include/Riemann.h"
 
-Riemann::Riemann(double *WR, double *WL, double Aij[DIM]) : WR { WR }, WL { WL }, Aij { Aij }{
+Riemann::Riemann(double *WR, double *WL, double *Aij, int i) : WR { WR }, WL { WL }, Aij { Aij }, i { i }{
 
     // compute norm of effective face
     AijNorm = sqrt(Helper::dotProduct(Aij, Aij));
@@ -15,7 +15,9 @@ Riemann::Riemann(double *WR, double *WL, double Aij[DIM]) : WR { WR }, WL { WL }
     hatAij[2] = 1./AijNorm*Aij[2];
 #endif
 
-    //Logger(DEBUG) << "Aij = [" << Aij[0] << ", " << Aij[1] << "], AijNorm = " << AijNorm;
+    //if (i == 6){
+    //    Logger(DEBUG) << "Aij = [" << Aij[0] << ", " << Aij[1] << "], AijNorm = " << AijNorm;
+    //}
 
 #if DIM==3
     Logger(ERROR) << "Rotation of states is not yet implemented in 3D. - Aborting.";
@@ -23,17 +25,38 @@ Riemann::Riemann(double *WR, double *WL, double Aij[DIM]) : WR { WR }, WL { WL }
 #endif
     // rotate states to be aligned with hatAij
     double Lambda[DIM*DIM];
-    Helper::rotationMatrix2D(unitX, hatAij, Lambda);
+    //Helper::rotationMatrix2D(unitX, hatAij, Lambda);
+    Helper::rotationMatrix2D(hatAij, unitX, Lambda);
 
     //Logger(DEBUG) << "hatAij = [" << hatAij[0] << ", " << hatAij[1] << "], |hatAij| = "
     //          << sqrt(Helper::dotProduct(hatAij, hatAij));
     //Logger(DEBUG) << "Lambda = [" << Lambda[0] << ", " << Lambda[1];
     //Logger(DEBUG) << "          " << Lambda[2] << ", " << Lambda[3] << "]";
 
-    WR[2] = Lambda[0]*WR[2]+Lambda[1]*WR[3];
-    WR[3] = Lambda[2]*WR[2]+Lambda[3]*WR[3];
-    WL[2] = Lambda[0]*WL[2]+Lambda[1]*WL[3];
-    WL[3] = Lambda[2]*WL[2]+Lambda[3]*WL[3];
+    //Logger(DEBUG) << "vR_unrot = [" << WR[2] << ", " << WR[3] << "], vL_unrot = ["
+    //          <<  WL[2] << ", " << WL[3] << "]";
+
+    if(i == 46){
+        Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
+                      << ", vR = [" << WR[2] << ", " << WR[3]
+                      << "], vL = [" <<  WL[2] << ", " << WL[3]
+                      << "], PR = " << WR[1] << ", PL = " << WL[1];
+    }
+
+    double vBufR[DIM] = { WR[2], WR[3] };
+    double vBufL[DIM] = { WL[2], WL[3] };
+
+    WR[2] = Lambda[0]*vBufR[0]+Lambda[1]*vBufR[1];
+    WR[3] = Lambda[2]*vBufR[0]+Lambda[3]*vBufR[1];
+    WL[2] = Lambda[0]*vBufL[0]+Lambda[1]*vBufL[1];
+    WL[3] = Lambda[2]*vBufL[0]+Lambda[3]*vBufL[1];
+
+    if(i == 46){
+        Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
+                      << ", vR = [" << WR[2] << ", " << WR[3]
+                      << "], vL = [" <<  WL[2] << ", " << WL[3]
+                      << "], PR = " << WR[1] << ", PL = " << WL[1];
+    }
 
     // TODO: add z-components to make it work for 3D
 }
@@ -70,24 +93,39 @@ void Riemann::exact(double *Fij, const double &gamma){
         // left state sampled
         vSol[1] = WL[3];
     }
-    rotateAndProjectFluxes2D(Fij, gamma);
-#endif
 
-    //Logger(DEBUG) << "Fij = [" << Fij[0] << " (mass), " << Fij[2] << " (vx), "
-    //          << Fij[3] << " (vy), " << Fij[1] << " (energy)]";
+    if (i == 46){
+        Logger(DEBUG) << "riemann solution = [" << rhoSol << ", " << vSol[0] << ", " << vSol[1] << ", " << PSol << "]";
+    }
+
+    rotateAndProjectFluxes2D(Fij, gamma);
+
+    if (i == 46){
+        Logger(DEBUG) << "Fij = [" << Fij[0] << " (mass), " << Fij[2] << " (vx), "
+                      << Fij[3] << " (vy), " << Fij[1] << " (energy)]";
+    }
+
+#endif
 }
 
 void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
 
     // rotate back velocities to simulation coordinate frame
     double LambdaInv[DIM*DIM];
-    Helper::rotationMatrix2D(hatAij, unitX, LambdaInv);
+    //Helper::rotationMatrix2D(hatAij, unitX, LambdaInv);
+    Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
 
+    //Logger(DEBUG) << "vSol_unrot = [" << vSol[0] << ", " << vSol[1] << "]";
     //Logger(DEBUG) << "LambdaInv = [" << LambdaInv[0] << ", " << LambdaInv[1]
     //          << ", " << LambdaInv[2] << ", " << LambdaInv[3] << "]";
 
-    vSol[0] = LambdaInv[0]*vSol[0]+LambdaInv[1]*vSol[1];
-    vSol[1] = LambdaInv[2]*vSol[0]+LambdaInv[3]*vSol[1];
+    double vSolBuf[DIM] = { vSol[0], vSol[1] };
+    vSol[0] = LambdaInv[0]*vSolBuf[0]+LambdaInv[1]*vSolBuf[1];
+    vSol[1] = LambdaInv[2]*vSolBuf[0]+LambdaInv[3]*vSolBuf[1];
+
+    if (i == 46){
+        Logger(DEBUG) << "rhoSol = " << rhoSol << ", vSol_rot = [" << vSol[0] << ", " << vSol[1] << "], PSol = " << PSol;
+    }
 
     /// Compute fluxes projected in Aij direction
     Fij[0] = hatAij[0]*rhoSol*vSol[0] + hatAij[1]*rhoSol*vSol[1]; // mass flux
@@ -95,6 +133,10 @@ void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
     Fij[3] = hatAij[0]*rhoSol*vSol[0]*vSol[1] + hatAij[1]*(rhoSol*vSol[1]*vSol[1]+PSol); // vy flux
     Fij[1] = hatAij[0]*vSol[0]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vSol, vSol) + PSol)
             + hatAij[1]*vSol[1]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vSol, vSol) + PSol); // energy flux
+
+    //double vFluxBuf[DIM] = { Fij[2], Fij[3] };
+    //Fij[2] = LambdaInv[0]*vFluxBuf[0]+LambdaInv[1]*vFluxBuf[1];
+    //Fij[3] = LambdaInv[2]*vFluxBuf[0]+LambdaInv[3]*vFluxBuf[1];
 
 }
 
