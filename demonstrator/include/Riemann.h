@@ -27,7 +27,7 @@ public:
 
 private:
     int i;
-    double *WR, *WL, *Aij, *Fij;
+    double *WR, *WL, *Aij; // *Fij;
     double rhoSol, vSol[DIM], PSol;
     double AijNorm, hatAij[DIM];
     double unitX[DIM] = { 1, 0

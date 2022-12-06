@@ -36,12 +36,12 @@ Riemann::Riemann(double *WR, double *WL, double *Aij, int i) : WR { WR }, WL { W
     //Logger(DEBUG) << "vR_unrot = [" << WR[2] << ", " << WR[3] << "], vL_unrot = ["
     //          <<  WL[2] << ", " << WL[3] << "]";
 
-    if(i == 46){
-        Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
-                      << ", vR = [" << WR[2] << ", " << WR[3]
-                      << "], vL = [" <<  WL[2] << ", " << WL[3]
-                      << "], PR = " << WR[1] << ", PL = " << WL[1];
-    }
+    //if(i == 46){
+    //    Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
+    //                  << ", vR = [" << WR[2] << ", " << WR[3]
+    //                  << "], vL = [" <<  WL[2] << ", " << WL[3]
+    //                  << "], PR = " << WR[1] << ", PL = " << WL[1];
+    //}
 
     double vBufR[DIM] = { WR[2], WR[3] };
     double vBufL[DIM] = { WL[2], WL[3] };
@@ -51,12 +51,12 @@ Riemann::Riemann(double *WR, double *WL, double *Aij, int i) : WR { WR }, WL { W
     WL[2] = Lambda[0]*vBufL[0]+Lambda[1]*vBufL[1];
     WL[3] = Lambda[2]*vBufL[0]+Lambda[3]*vBufL[1];
 
-    if(i == 46){
-        Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
-                      << ", vR = [" << WR[2] << ", " << WR[3]
-                      << "], vL = [" <<  WL[2] << ", " << WL[3]
-                      << "], PR = " << WR[1] << ", PL = " << WL[1];
-    }
+    //if(i == 46){
+    //    Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
+    //                  << ", vR = [" << WR[2] << ", " << WR[3]
+    //                  << "], vL = [" <<  WL[2] << ", " << WL[3]
+    //                  << "], PR = " << WR[1] << ", PL = " << WL[1];
+    //}
 
     // TODO: add z-components to make it work for 3D
 }
@@ -94,16 +94,16 @@ void Riemann::exact(double *Fij, const double &gamma){
         vSol[1] = WL[3];
     }
 
-    if (i == 46){
-        Logger(DEBUG) << "riemann solution = [" << rhoSol << ", " << vSol[0] << ", " << vSol[1] << ", " << PSol << "]";
-    }
+    //if (i == 46){
+    //    Logger(DEBUG) << "riemann solution = [" << rhoSol << ", " << vSol[0] << ", " << vSol[1] << ", " << PSol << "]";
+    //}
 
     rotateAndProjectFluxes2D(Fij, gamma);
 
-    if (i == 46){
-        Logger(DEBUG) << "Fij = [" << Fij[0] << " (mass), " << Fij[2] << " (vx), "
-                      << Fij[3] << " (vy), " << Fij[1] << " (energy)]";
-    }
+    //if (i == 46){
+    //    Logger(DEBUG) << "Fij = [" << Fij[0] << " (mass), " << Fij[2] << " (vx), "
+    //                  << Fij[3] << " (vy), " << Fij[1] << " (energy)]";
+    //}
 
 #endif
 }
@@ -123,9 +123,9 @@ void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
     vSol[0] = LambdaInv[0]*vSolBuf[0]+LambdaInv[1]*vSolBuf[1];
     vSol[1] = LambdaInv[2]*vSolBuf[0]+LambdaInv[3]*vSolBuf[1];
 
-    if (i == 46){
-        Logger(DEBUG) << "rhoSol = " << rhoSol << ", vSol_rot = [" << vSol[0] << ", " << vSol[1] << "], PSol = " << PSol;
-    }
+    //if (i == 46){
+    //    Logger(DEBUG) << "rhoSol = " << rhoSol << ", vSol_rot = [" << vSol[0] << ", " << vSol[1] << "], PSol = " << PSol;
+    //}
 
     /// Compute fluxes projected in Aij direction
     Fij[0] = hatAij[0]*rhoSol*vSol[0] + hatAij[1]*rhoSol*vSol[1]; // mass flux

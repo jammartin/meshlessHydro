@@ -18,9 +18,6 @@
 **/
 #define MAX_NUM_GHOST_INTERACTIONS 100
 
-/// define verbosity for each VERBOSITY_PARTICLES particles
-#define VERBOSITY_PARTICLES 10
-
 /// flag for slope limiting, 0: no slope limiting
 #define SLOPE_LIMITING 1
 
@@ -29,5 +26,22 @@
 
 /// use first order quadrature point for Riemann problems
 #define FIRST_ORDER_QUAD_POINT 1
+
+/// enforcing flux symmetry by only calculating on side
+#define ENFORCE_FLUX_SYM 1
+
+/** define debug level to enable additional output:
+ * 0: no debug additions
+ * 1: additional checks
+ * 2: dump NNL and ghosts to files
+**/
+#define DEBUG_LVL 2
+
+/// define verbosity for each VERBOSITY_PARTICLES particles
+// TODO: use this flag when debug level 1
+#define VERBOSITY_PARTICLES 10
+
+/// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
+#define FLUX_SYM_TOL 1e-20
 
 #endif //DEMONSTRATOR_PARAMETER_H

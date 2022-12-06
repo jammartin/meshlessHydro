@@ -119,11 +119,13 @@ void MeshlessScheme::run(){
             Logger(INFO) << "      > Dump particles to file";
             particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
 
+#if DEBUG_LVL > 1
 #if PERIODIC_BOUNDARIES
             Logger(INFO) << "      > Dump ghosts to file";
             ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
             Logger(INFO) << "      > Dump NNL to file";
             particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
+#endif
 #endif
         }
         if (t>=config.timeEnd){
@@ -133,6 +135,15 @@ void MeshlessScheme::run(){
 
         Logger(INFO) << "    > Solving Riemann problems";
         particles->solveRiemannProblems(config.gamma, ghostParticles);
+
+#if DEBUG_LVL
+        Logger(DEBUG) << "    > Checking flux symmetry";
+#if PERIODIC_BOUNDARIES
+        particles->checkFluxSymmetry(&ghostParticles);
+#else
+        particles->checkFluxSymmetry();
+#endif
+#endif
 
         Logger(INFO) << "    > Collecting fluxes";
         particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary

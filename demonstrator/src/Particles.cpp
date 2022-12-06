@@ -140,19 +140,25 @@ void Particles::assignParticlesAndCells(Domain &domain){
         int floorX = floor((x[i]-domain.bounds.minX)/domain.cellSizeX);
         int floorY = floor((y[i]-domain.bounds.minY)/domain.cellSizeY);
 
-        // TODO: check if block below is necessary
-        /*if (x[i] == domain.bounds.maxX){
+        // This rarely happens when x or y is really close to the domain bounds
+        if (floorX == domain.cellsX){
             floorX -= 1;
         }
-        if (y[i] == domain.bounds.maxY){
+        if (floorY == domain.cellsY){
             floorY -= 1;
-        }*/
+        }
 
         int iGrid = floorX + floorY * domain.cellsX
 #if DIM == 3
         + floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ) * domain.cellsX * domain.cellsY
 #endif
         ;
+
+        //if (floorX >= domain.cellsX || floorY >= domain.cellsY){
+        //    Logger(ERROR) << "  > Particle i = " << i << " cannot be properly assigned to search grid.";
+        //    Logger(ERROR) << "    > x = " << x[i] << " -> floorX = " << floorX
+        //                  << ", y = " << y[i] << " -> floorY = " << floorY;
+        //}
 
         //Logger(DEBUG) << "floor x = " << floorX
         //          << ", floor y = " << floorY;
@@ -554,26 +560,26 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijL[iW][4] = vz[j] - vFrame[iW][2];
 #endif
 
-            if (i == 46){// && jn == 28){
-                Logger(DEBUG) << "        j = " << j
-                              << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
-                              << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
-                              << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1];
-            }
+            //if (i == 46){// && jn == 28){
+            //    Logger(DEBUG) << "        j = " << j
+            //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
+            //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
+            //                  << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1];
+            //}
 
-            if(i == 46){// && jn == 28){
-                Logger(DEBUG) << "vFrame[iW] = [" << vFrame[iW][0]
-                            << ", " << vFrame[iW][1] << "]"
-                            << ", rhoGrad[i] = [" << rhoGrad[i][0]
-                            << ", " << rhoGrad[i][1] << "]";
-                Logger(DEBUG) << "PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
-                            << "], PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
-                            << "], rho[i] = " << rho[i]
+            //if(i == 46){// && jn == 28){
+            //    Logger(DEBUG) << "vFrame[iW] = [" << vFrame[iW][0]
+            //                << ", " << vFrame[iW][1] << "]"
+            //                << ", rhoGrad[i] = [" << rhoGrad[i][0]
+            //                << ", " << rhoGrad[i][1] << "]";
+            //    Logger(DEBUG) << "PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
+            //                << "], PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
+            //                << "], rho[i] = " << rho[i]
                 //            << "], xijxi = [" << xijxi[0] << ", " << xijxi[1]
                 //            << "], xijxj = [" << xijxj[0] << ", " << xijxj[1] << "]";
-                            << ", xj = [" << x[j] << ", " << x[j] << "] @" << j;
+            //                << ", xj = [" << x[j] << ", " << y[j] << "] @" << j;
                 //exit(5);
-            }
+            //}
             // reconstruction at effective face
             WijR[iW][0] += Helper::dotProduct(rhoGrad[i], xijxi);
             WijL[iW][0] += Helper::dotProduct(rhoGrad[j], xijxj);
@@ -588,7 +594,7 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijL[iW][4] += Helper::dotProduct(vzGrad[j], xijxj);
 #endif
 
-            //if (i == 23 && jn == 28){
+            //if (i == 46){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
             //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
@@ -607,16 +613,17 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijR[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrame[iW][0])*PGrad[i][0] + (vy[i]-vFrame[iW][1])*PGrad[i][1]);
             WijL[iW][1] -= dt/2. * (gamma*P[j] * vjDiv + (vx[j]-vFrame[iW][0])*PGrad[j][0] + (vy[j]-vFrame[iW][1])*PGrad[j][1]);
             // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff)
-            WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*viDiv);
-            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vjDiv);
-            WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vy[i]-vFrame[iW][1])*viDiv);
-            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vy[j]-vFrame[iW][1])*vjDiv);
+            WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*vxGrad[i][0] + (vy[i]-vFrame[iW][1])*vxGrad[i][1]);
+            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[i]-vFrame[iW][1])*vxGrad[j][1]);
+            WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vx[i]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[i][1]);
+            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[j][1]);
 #if DIM==3
+            // TODO: update below for 3D
             WijR[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
             WijL[iW][4] -= dt/2. * PGrad[j][2]/rho[j];
 #endif
 
-            //if (i == 6){// && jn == 28){
+            //if (i == 46){// && jn == 28){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
             //                  << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
@@ -661,12 +668,35 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                               << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
                               << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
                               << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
+#if DEBUG_LVL
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
+#endif
             }
 
-            Riemann solver { WijR[ii], WijL[ii], Aij[ii] , i };
-            solver.exact(Fij[ii], gamma);
+            bool compute = true;
+            int iij;
+#if ENFORCE_FLUX_SYM
+            //int ii = i*MAX_NUM_INTERACTIONS+j; // interaction index i->j
+            int ji = nnl[ii]; // index i of particle j
+            if(ji<i) {
+                compute = false;
+                // search neighbor i in nnl[] of j
+                int ij;
+                for (ij = 0; ij < noi[ji]; ++ij) {
+                    if (nnl[ij + ji * MAX_NUM_INTERACTIONS] == i) break;
+                }
+                iij = ji * MAX_NUM_INTERACTIONS + ij; // interaction index j->i
+            }
+#endif
+            if (compute){
+                Riemann solver { WijR[ii], WijL[ii], Aij[ii] , i };
+                solver.exact(Fij[ii], gamma);
+            } else {
+                for(int d=0; d<DIM+2; ++d){
+                    Fij[ii][d] = -Fij[iij][d];
+                }
+            }
 
             //if(i == 6){//&& j==11){
             //    Logger(DEBUG) << "Fluxes = [" << Fij[ii][0] << ", " << Fij[ii][1] << ", " << Fij[ii][2] << ", " << Fij[ii][3] << "]";
@@ -686,12 +716,36 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                 Logger(DEBUG) << "rhoL = " << WijLGhosts[ii][0] << ", rhoR = " << WijRGhosts[ii][0]
                               << ", uL = " << WijLGhosts[ii][2] << ", uR = " << WijRGhosts[ii][2]
                               << ", PL = " << WijLGhosts[ii][1] << ", PR = " << WijRGhosts[ii][1];
+#if DEBUG_LVL
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
+#endif
             }
 
-            Riemann solver { WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii], i };
-            solver.exact(FijGhosts[ii], gamma);
+            bool compute = true;
+            int iij;
+#if ENFORCE_FLUX_SYM
+            //int ii = i*MAX_NUM_GHOST_INTERACTIONS+j; // interaction index i->j
+            int ji = nnlGhosts[ii]; // index i of particle j
+            if (ghostParticles.parent[ji]<i){
+                compute = false;
+                int ij;
+                // search neighbor i in nnlGhosts[] of j
+                for (ij=0; ij<noiGhosts[ghostParticles.parent[ji]]; ++ij){
+                    if(ghostParticles.parent[nnlGhosts[ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS]] == i) break;
+                }
+                iij = ij+ghostParticles.parent[ji]*MAX_NUM_GHOST_INTERACTIONS;
+            }
+#endif
+
+            if (compute) {
+                Riemann solver{WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii], i};
+                solver.exact(FijGhosts[ii], gamma);
+            } else {
+                for(int d=0; d<DIM+2; ++d){
+                    FijGhosts[ii][d] = -FijGhosts[iij][d];
+                }
+            }
         }
 #endif
     }
@@ -736,12 +790,12 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
             eF[i] += AijNorm*(Fij[ii][1] + .5*Helper::dotProduct(vFrame[ii], vFrame[ii])*Fij[ii][0]
                               + Helper::dotProduct(vFrame[ii], Fv));
 
-            if (i == 46){
-                Logger(DEBUG) << "  > j = " << nnl[ii];
-                Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
-                              << "], Fe = " << eF[i]
-                << ", vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
-            }
+            //if (i == 46){
+            //    Logger(DEBUG) << "  > j = " << nnl[ii] << ", AijNorm = " << AijNorm
+            //              << ", vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+            //    Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
+            //                  << "], Fe = " << eF[i];
+            //}
 
         }
 
@@ -772,12 +826,12 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
             eF[i] += AijNorm*(FijGhosts[ii][1] + .5*Helper::dotProduct(vFrameGhosts[ii], vFrameGhosts[ii])*FijGhosts[ii][0]
                               + Helper::dotProduct(vFrameGhosts[ii], Fv));
 
-            if (i == 46){
-                Logger(DEBUG) << "  > jGhost = " << nnlGhosts[ii];
-                Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
-                              << "], Fe = " << eF[i]
-                << ", vFrame = [" << vFrameGhosts[ii][0] << ", " << vFrameGhosts[ii][1] << "]";
-            }
+            //if (i == 46){
+            //    Logger(DEBUG) << "  > jGhost = " << nnlGhosts[ii] << ", AijNorm = " << AijNorm
+            //                  << ", vFrame = [" << vFrameGhosts[ii][0] << ", " << vFrameGhosts[ii][1] << "]";
+            //    Logger(DEBUG) << "  > Fm = " << mF[i] << ", Fv = [" << vF[i][0] << ", " << vF[i][1]
+            //                  << "], Fe = " << eF[i];
+            //}
         }
 #endif
     }
@@ -805,10 +859,10 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 #if DIM==3
         Q[3] = m[i]*vzi;
 #endif
-        if(i == 46){
-            Logger(DEBUG) << "i = " << i << ", mass flux = " << mF[i]
-                          << ", momentum flux = [" << vF[i][0] << ", " << vF[i][1] << "], energy flux = " << eF[i];
-        }
+        //if(i == 46){
+        //    Logger(DEBUG) << "i = " << i << ", mass flux = " << mF[i]
+        //                  << ", momentum flux = [" << vF[i][0] << ", " << vF[i][1] << "], energy flux = " << eF[i];
+        //}
 
         // UPDATE MASS
         m[i] -= dt*mF[i];
@@ -1403,11 +1457,12 @@ void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, co
             WijLGhosts[iW][0] -= dt/2. * (ghostParticles.rho[j] * vjDiv + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.rhoGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.rhoGrad[j][1]);
             WijRGhosts[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrameGhosts[iW][0])*PGrad[i][0] + (vy[i]-vFrameGhosts[iW][1])*PGrad[i][1]);
             WijLGhosts[iW][1] -= dt/2. * (gamma*ghostParticles.P[j] * vjDiv + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.PGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.PGrad[j][1]);
-            WijRGhosts[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i] - vFrameGhosts[iW][0])*viDiv);
-            WijLGhosts[iW][2] -= dt/2. * (ghostParticles.PGrad[j][0]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*vjDiv);
-            WijRGhosts[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vy[i] - vFrameGhosts[iW][1])*viDiv);
-            WijLGhosts[iW][3] -= dt/2. * (ghostParticles.PGrad[j][1]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*vjDiv);
+            WijRGhosts[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i] - vFrameGhosts[iW][0])*vxGrad[i][0] + (vy[i] - vFrameGhosts[iW][1])*vxGrad[i][1]);
+            WijLGhosts[iW][2] -= dt/2. * (ghostParticles.PGrad[j][0]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.vxGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.vxGrad[j][1]);
+            WijRGhosts[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vx[i] - vFrameGhosts[iW][0])*vyGrad[i][0] + (vy[i] - vFrameGhosts[iW][1])*vyGrad[i][1]);
+            WijLGhosts[iW][3] -= dt/2. * (ghostParticles.PGrad[j][1]/ghostParticles.rho[j] + (ghostParticles.vx[j]-vFrameGhosts[iW][0])*ghostParticles.vyGrad[j][0] + (ghostParticles.vy[j]-vFrameGhosts[iW][1])*ghostParticles.vyGrad[j][1]);
 #if DIM==3
+            // TODO: update below for 3D
             WijRGhosts[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
             WijLGhosts[iW][4] -= dt/2. * ghostParticles.PGrad[j][2]/ghostParticles.rho[j];
 #endif
@@ -1443,6 +1498,9 @@ void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
 
         int noiTot = noi[i] + noiGhosts[i];
         std::vector<std::vector<double>> nnlPrtcls {};
+        std::vector<std::vector<double>> nnlAij {};
+        std::vector<std::vector<double>> vFrame {};
+        
 
         std::vector<size_t> dataSpaceDims(2);
         dataSpaceDims[0] = std::size_t(noiTot);
@@ -1530,6 +1588,89 @@ double Particles::sumMass(){
         M += m[i];
     }
     return M;
+}
+
+void Particles::checkFluxSymmetry(Particles *ghostParticles){
+    for (int i=0; i<N; ++i){
+        for (int j=0; j<noi[i]; ++j){
+            int ii = i*MAX_NUM_INTERACTIONS+j; // interaction index i->j
+
+            int ji = nnl[ii]; // index i of particle j
+            // search neighbor i in nnl[] of j
+            int ij;
+            for(ij=0; ij<noi[ji]; ++ij){
+                if (nnl[ij+ji*MAX_NUM_INTERACTIONS] == i) break;
+            }
+            int iij = ji*MAX_NUM_INTERACTIONS+ij; // interaction index j->i
+
+            bool notSym = false;
+            if (Fij[iij][0] + Fij[ii][0] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Mass fluxes are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][0] << ", Fji = " << Fij[iij][0];
+                notSym = true;
+            }
+            if (Fij[iij][1] + Fij[ii][1] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Energy fluxes are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][1] << ", Fji = " << Fij[iij][1];
+                notSym = true;
+            }
+            if (Fij[iij][2] + Fij[ii][2] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Momentum fluxes (x) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][2] << ", Fji = " << Fij[iij][2];
+                notSym = true;
+            }
+            if (Fij[iij][3] + Fij[ii][3] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Momentum fluxes (y) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][3] << ", Fji = " << Fij[iij][3];
+                notSym = true;
+            }
+            if (notSym){
+                Logger(INFO) << "  > Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "], Aji = ["
+                             << Aij[iij][0] << ", " << Aij[iij][1] << "]";
+            }
+        }
+#if PERIODIC_BOUNDARIES
+        for (int j=0; j<noiGhosts[i]; ++j) {
+            int ii = i * MAX_NUM_GHOST_INTERACTIONS + j; // interaction index i->j
+
+            int ji = nnlGhosts[ii]; // index i of particle j
+            // search neighbor i in nnl[] of j
+            int ij;
+            // search neighbor i in nnlGhosts[] of j
+            for (ij = 0; ij < noiGhosts[ghostParticles->parent[ji]]; ++ij) {
+                if (ghostParticles->parent[nnlGhosts[ij + ghostParticles->parent[ji] * MAX_NUM_GHOST_INTERACTIONS]]
+                    == i) break;
+            }
+            int iij = ij + ghostParticles->parent[ji] * MAX_NUM_GHOST_INTERACTIONS; // interaction index j->i
+
+            bool notSym = false;
+            if (FijGhosts[iij][0] + FijGhosts[ii][0] > FLUX_SYM_TOL) {
+                Logger(WARN) << "  > Ghosts mass fluxes are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << FijGhosts[ii][0] << ", Fji = " << FijGhosts[iij][0];
+                notSym = true;
+            }
+            if (FijGhosts[iij][1] + FijGhosts[ii][1] > FLUX_SYM_TOL) {
+                Logger(WARN) << "  > Ghosts energy fluxes are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << FijGhosts[ii][1] << ", Fji = " << FijGhosts[iij][1];
+                notSym = true;
+            }
+            if (FijGhosts[iij][2] + FijGhosts[ii][2] > FLUX_SYM_TOL) {
+                Logger(WARN) << "  > Ghosts momentum fluxes (x) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << FijGhosts[ii][2] << ", Fji = " << FijGhosts[iij][2];
+                notSym = true;
+            }
+            if (FijGhosts[iij][3] + FijGhosts[ii][3] > FLUX_SYM_TOL) {
+                Logger(WARN) << "  > Ghosts momentum fluxes (y) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << FijGhosts[ii][3] << ", Fji = " << FijGhosts[iij][3];
+                notSym = true;
+            }
+            if (notSym) {
+                Logger(INFO) << "  > AijGhost = [" << AijGhosts[ii][0] << ", " << AijGhosts[ii][1] << "], Aji = ["
+                             << AijGhosts[iij][0] << ", " << AijGhosts[iij][1] << "]";
+            }
+        }
+#endif
+    }
 }
 
 void Particles::dump2file(std::string filename){

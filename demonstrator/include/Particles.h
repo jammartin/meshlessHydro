@@ -81,6 +81,7 @@ public:
     /// sanity check functions
     double sumVolume();
     double sumMass();
+    void checkFluxSymmetry(Particles *ghostParticles=nullptr);
 
     void dump2file(std::string filename);
 
