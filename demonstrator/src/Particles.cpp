@@ -480,7 +480,7 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
     }
 }
 
-void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma){
+void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma){
     for (int i=0; i<N; ++i){
         double xij[DIM];
         //double vFrame[DIM];
@@ -690,7 +690,8 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
             }
 #endif
             if (compute){
-                Riemann solver { WijR[ii], WijL[ii], Aij[ii] , i };
+                //Riemann solver { WijR[ii], WijL[ii], vFrame[ii], Aij[ii] , i };
+                Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii] , i };
                 solver.exact(Fij[ii], gamma);
             } else {
                 for(int d=0; d<DIM+2; ++d){
@@ -739,7 +740,8 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 #endif
 
             if (compute) {
-                Riemann solver{WijRGhosts[ii], WijLGhosts[ii], AijGhosts[ii], i};
+                //Riemann solver{WijRGhosts[ii], WijLGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], i};
+                Riemann solver{WijLGhosts[ii], WijRGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], i};
                 solver.exact(FijGhosts[ii], gamma);
             } else {
                 for(int d=0; d<DIM+2; ++d){
@@ -766,10 +768,11 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
         for(int j=0; j<noi[i]; ++j){
             int ii = j+i*MAX_NUM_INTERACTIONS;
-            double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
+            //double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
 
             /// MASS FLUXES
-            mF[i] += AijNorm*Fij[ii][0];
+            //mF[i] += AijNorm*Fij[ii][0];
+            mF[i] += Fij[ii][0];
 
             //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
             //          << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
@@ -777,18 +780,23 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
             /// VELOCITY FLUXES
             // add de-boosted velocities
-            vF[i][0] += AijNorm * (Fij[ii][2] + Fij[ii][0]*vFrame[ii][0]);
-            vF[i][1] += AijNorm * (Fij[ii][3] + Fij[ii][0]*vFrame[ii][1]);
+            //vF[i][0] += AijNorm * (Fij[ii][2] + Fij[ii][0]*vFrame[ii][0]);
+            //vF[i][1] += AijNorm * (Fij[ii][3] + Fij[ii][0]*vFrame[ii][1]);
+
+            vF[i][0] += Fij[ii][2];
+            vF[i][1] += Fij[ii][3];
 
             // TODO: implement z-component to work for 3D
 
             /// ENERGY FLUXES
             // allocate buffer for energy update
-            double Fv[DIM];
-            Fv[0] = Fij[ii][2];
-            Fv[1] = Fij[ii][3];
-            eF[i] += AijNorm*(Fij[ii][1] + .5*Helper::dotProduct(vFrame[ii], vFrame[ii])*Fij[ii][0]
-                              + Helper::dotProduct(vFrame[ii], Fv));
+            //double Fv[DIM];
+            //Fv[0] = Fij[ii][2];
+            //Fv[1] = Fij[ii][3];
+            //eF[i] += AijNorm*(Fij[ii][1] + .5*Helper::dotProduct(vFrame[ii], vFrame[ii])*Fij[ii][0]
+            //                  + Helper::dotProduct(vFrame[ii], Fv));
+
+            eF[i] += Fij[ii][1];
 
             //if (i == 46){
             //    Logger(DEBUG) << "  > j = " << nnl[ii] << ", AijNorm = " << AijNorm
@@ -802,10 +810,11 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 #if PERIODIC_BOUNDARIES
         for(int j=0; j<noiGhosts[i]; ++j){
             int ii = j+i*MAX_NUM_GHOST_INTERACTIONS;
-            double AijNorm = sqrt(Helper::dotProduct(AijGhosts[ii], AijGhosts[ii]));
+            //double AijNorm = sqrt(Helper::dotProduct(AijGhosts[ii], AijGhosts[ii]));
 
             /// MASS FLUXES
-            mF[i] += AijNorm*FijGhosts[ii][0];
+            //mF[i] += AijNorm*FijGhosts[ii][0];
+            mF[i] += FijGhosts[ii][0];
 
             //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
             //              << ", xjGhost = [" << ghostParticles.x[nnlGhosts[ii]] << ", " << ghostParticles.y[nnlGhosts[ii]] << "]"
@@ -813,18 +822,24 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
             /// VELOCITY FLUXES
             // add de-boosted velocities
-            vF[i][0] += AijNorm * (FijGhosts[ii][2] + FijGhosts[ii][0]*vFrameGhosts[ii][0]);
-            vF[i][1] += AijNorm * (FijGhosts[ii][3] + FijGhosts[ii][0]*vFrameGhosts[ii][1]);
+            //vF[i][0] += AijNorm * (FijGhosts[ii][2] + FijGhosts[ii][0]*vFrameGhosts[ii][0]);
+            //vF[i][1] += AijNorm * (FijGhosts[ii][3] + FijGhosts[ii][0]*vFrameGhosts[ii][1]);
+
+            vF[i][0] += FijGhosts[ii][2];
+            vF[i][1] += FijGhosts[ii][3];
+
 
             // TODO: implement z-component to work for 3D
 
             /// ENERGY FLUXES
             // allocate buffer for energy update
-            double Fv[DIM];
-            Fv[0] = FijGhosts[ii][2];
-            Fv[1] = FijGhosts[ii][3];
-            eF[i] += AijNorm*(FijGhosts[ii][1] + .5*Helper::dotProduct(vFrameGhosts[ii], vFrameGhosts[ii])*FijGhosts[ii][0]
-                              + Helper::dotProduct(vFrameGhosts[ii], Fv));
+            //double Fv[DIM];
+            //Fv[0] = FijGhosts[ii][2];
+            //Fv[1] = FijGhosts[ii][3];
+            //eF[i] += AijNorm*(FijGhosts[ii][1] + .5*Helper::dotProduct(vFrameGhosts[ii], vFrameGhosts[ii])*FijGhosts[ii][0]
+            //                  + Helper::dotProduct(vFrameGhosts[ii], Fv));
+
+            eF[i] += FijGhosts[ii][1];
 
             //if (i == 46){
             //    Logger(DEBUG) << "  > jGhost = " << nnlGhosts[ii] << ", AijNorm = " << AijNorm
@@ -883,11 +898,15 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 #if DIM==3
         u[i] = (Q[0]-.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]))/m[i];
 #else
-        u[i] = (Q[0]-.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]))/m[i];
+        u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]);
 #endif
+
+#if MOVE_PARTICLES
         // MOVE PARTICLES
-        x[i] += .5*(vx[i]+vxi)*dt;
-        y[i] += .5*(vy[i]+vyi)*dt;
+        //x[i] += .5*(vx[i]+vxi)*dt;
+        //y[i] += .5*(vy[i]+vyi)*dt;
+        x[i] += vxi*dt;
+        y[i] += vyi*dt;
 #if DIM==3
         z[i] += .5*(vz[i]+vzi)*dt;
 #endif
@@ -908,6 +927,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         } else if (domain.bounds.maxZ <= z[i]) {
             z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
         }
+#endif
 #endif
 #endif
     }
@@ -1333,7 +1353,7 @@ void Particles::compEffectiveFace(const Particles &ghostParticles){
     }
 }
 
-void Particles::compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma,
+void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma,
                                   const Particles &ghostParticles){
 
     for (int i=0; i<N; ++i){
@@ -1497,39 +1517,92 @@ void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
     for (int i=0; i<N; ++i){
 
         int noiTot = noi[i] + noiGhosts[i];
+
+        std::vector<int> nnList(noiTot);
+
         std::vector<std::vector<double>> nnlPrtcls {};
         std::vector<std::vector<double>> nnlAij {};
-        std::vector<std::vector<double>> vFrame {};
-        
+        std::vector<std::vector<double>> nnl_vFrame {};
+        std::vector<std::vector<double>> nnlWijR {};
+        std::vector<std::vector<double>> nnlWijL {};
 
         std::vector<size_t> dataSpaceDims(2);
         dataSpaceDims[0] = std::size_t(noiTot);
         dataSpaceDims[1] = DIM;
 
         for (int j=0; j<noi[i]; ++j){
+
+            int ii = j+i*MAX_NUM_INTERACTIONS;
+
+            nnList[j] = nnl[ii];
+
             nnlPrtcls.push_back(std::vector<double>(DIM));
-            nnlPrtcls[j][0] = x[nnl[i*MAX_NUM_INTERACTIONS+j]];
-            nnlPrtcls[j][1] = y[nnl[i*MAX_NUM_INTERACTIONS+j]];
+            nnlPrtcls[j][0] = x[nnl[ii]];
+            nnlPrtcls[j][1] = y[nnl[ii]];
 #if DIM == 3
-            nnlPrtcls[j][2] = z[nnl[i*MAX_NUM_INTERACTIONS+j]];
+            nnlPrtcls[j][2] = z[nnl[ii]];
+#endif
+            nnlAij.push_back(std::vector<double>(DIM));
+            nnlAij[j][0] = Aij[ii][0];
+            nnlAij[j][1] = Aij[ii][1];
+#if DIM == 3
+            nnlAij[j][2] = Aij[ii][2];
+#endif
+
+            nnl_vFrame.push_back(std::vector<double>(DIM));
+            nnl_vFrame[j][0] = vFrame[ii][0];
+            nnl_vFrame[j][1] = vFrame[ii][1];
+#if DIM == 3
+            nnl_vFrame[j][2] = vFrame[ii][2];
 #endif
         }
 
         for (int j=0; j<noiGhosts[i]; ++j){
+
+            int ii = j+i*MAX_NUM_GHOST_INTERACTIONS;
+
+            nnList[j+noi[i]] = nnlGhosts[ii];
+
             nnlPrtcls.push_back(std::vector<double>(DIM));
-            nnlPrtcls[j+noi[i]][0] = ghostParticles.x[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
-            nnlPrtcls[j+noi[i]][1] = ghostParticles.y[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
+            nnlPrtcls[j+noi[i]][0] = ghostParticles.x[nnlGhosts[ii]];
+            nnlPrtcls[j+noi[i]][1] = ghostParticles.y[nnlGhosts[ii]];
 #if DIM == 3
-            nnlPrtcls[j+noi[i]][2] = ghostParticles.z[nnlGhosts[i*MAX_NUM_GHOST_INTERACTIONS+j]];
+            nnlPrtcls[j+noi[i]][2] = ghostParticles.z[nnlGhosts[ii]];
 #endif
+            nnlAij.push_back(std::vector<double>(DIM));
+            nnlAij[j+noi[i]][0] = AijGhosts[ii][0];
+            nnlAij[j+noi[i]][1] = AijGhosts[ii][1];
+#if DIM == 3
+            nnlAij[j+noi[i]][2] = AijGhosts[ii][2];
+#endif
+
+            nnl_vFrame.push_back(std::vector<double>(DIM));
+            nnl_vFrame[j+noi[i]][0] = vFrameGhosts[ii][0];
+            nnl_vFrame[j+noi[i]][1] = vFrameGhosts[ii][1];
+#if DIM == 3
+            nnl_vFrame[j+noi[i]][2] = vFrameGhosts[ii][2];
+#endif
+
         }
+
+        HighFive::DataSet nnListDataSet = h5File.createDataSet<int>("/nnl" +std::to_string(i),
+                                                                    HighFive::DataSpace(noiTot));
+        nnListDataSet.write(nnList);
 
         HighFive::DataSet nnlDataSet = h5File.createDataSet<double>("/nnlPrtcls" + std::to_string(i),
                                                                     HighFive::DataSpace(dataSpaceDims));
         nnlDataSet.write(nnlPrtcls);
+
+        HighFive::DataSet AijDataSet = h5File.createDataSet<double>("/Aij" + std::to_string(i),
+                                                                    HighFive::DataSpace(dataSpaceDims));
+        AijDataSet.write(nnlAij);
+
+        HighFive::DataSet vFrameDataSet = h5File.createDataSet<double>("/vFrame" + std::to_string(i),
+                                                                    HighFive::DataSpace(dataSpaceDims));
+        vFrameDataSet.write(nnl_vFrame);
+
     }
 }
-
 
 #endif
 
@@ -1588,6 +1661,30 @@ double Particles::sumMass(){
         M += m[i];
     }
     return M;
+}
+
+double Particles::sumEnergy(){
+    double E = 0.;
+    for (int i=0; i<N; ++i){
+        E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]));
+    }
+    return E;
+}
+
+double Particles::sumMomentumX(){
+    double momX = 0.;
+    for (int i=0; i<N; ++i){
+        momX += m[i]*vx[i];
+    }
+    return momX;
+}
+
+double Particles::sumMomentumY(){
+    double momY = 0.;
+    for (int i=0; i<N; ++i){
+        momY += m[i]*vy[i];
+    }
+    return momY;
 }
 
 void Particles::checkFluxSymmetry(Particles *ghostParticles){

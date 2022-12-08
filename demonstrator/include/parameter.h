@@ -12,11 +12,11 @@
 #define PERIODIC_BOUNDARIES 1
 
 /// maximum number of interactions for each particle
-#define MAX_NUM_INTERACTIONS 100
+#define MAX_NUM_INTERACTIONS 400
 /** maximum interactions with ghost particles
  *  ignored when `PERIODIC_BOUNDARIES` is not set
 **/
-#define MAX_NUM_GHOST_INTERACTIONS 100
+#define MAX_NUM_GHOST_INTERACTIONS 300
 
 /// flag for slope limiting, 0: no slope limiting
 #define SLOPE_LIMITING 1
@@ -30,12 +30,15 @@
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
 
+/// define is particles should move, otherwise a fixed grid is used
+#define MOVE_PARTICLES 1
+
 /** define debug level to enable additional output:
  * 0: no debug additions
  * 1: additional checks
  * 2: dump NNL and ghosts to files
 **/
-#define DEBUG_LVL 2
+#define DEBUG_LVL 1
 
 /// define verbosity for each VERBOSITY_PARTICLES particles
 // TODO: use this flag when debug level 1

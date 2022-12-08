@@ -17,8 +17,8 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
     fig, ax = plt.subplots(figsize=(8,6), dpi=200)
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.) # good for ~100 particles
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=200.) # good for ~400 particles
-    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=100.) # good for ~900 particles
-    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.) # good for 10**4 particles
+    #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=100.) # good for ~900 particles
+    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.) # good for 10**4 particles
 
     #PPlt = ax.scatter(pos[:,0], pos[:,1], c=P, s=200.) # good for ~400 particles
     
@@ -33,7 +33,7 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
         plotGradient(data["rhoGrad"][:], pos, ax);
     elif not plotGrad and plotVel:
         plotVelocity(data["v"][:], pos, ax)
-    else:
+    elif plotGrad and plotVel:
         print("WARNING: command line arguments '--plotVelocity' and '--plotGradient' are incompatible. - Plotting neither.")
 
     # plot NNL for particle i
@@ -53,7 +53,7 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
     #plt.show()
 
 def plotGradient(grad, pos, ax):
-    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=100.)
+    ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale_units='xy', scale=1.)
     #ax.quiver(pos[:,0], pos[:,1], grad[:,0], grad[:,1], angles='xy', scale=.01)
     
     #for i, rhoGrad in enumerate(grad):

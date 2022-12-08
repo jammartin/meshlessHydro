@@ -43,7 +43,7 @@ public:
     void compPressure(const double &gamma);
     void compEffectiveFace();
 
-    void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma);
+    void compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma);
 
     void solveRiemannProblems(const double &gamma, const Particles &ghostParticles);
 
@@ -60,8 +60,8 @@ public:
     void compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize);
     void gradient(double *f, double (*grad)[DIM], double *fGhost, const Particles &ghostParticles); //TODO: remove ghostParticles argument
     void compEffectiveFace(const Particles &ghostParticles);
-    void compRiemannFluxes(const double &dt, const double &kernelSize, const double &gamma,
-                           const Particles &ghostParticles);
+    void compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma,
+                             const Particles &ghostParticles);
 
     /// functions to copy computed quantities to ghosts needed for further processing
     void updateGhostState(Particles &ghostParticles);
@@ -81,6 +81,9 @@ public:
     /// sanity check functions
     double sumVolume();
     double sumMass();
+    double sumEnergy();
+    double sumMomentumX();
+    double sumMomentumY();
     void checkFluxSymmetry(Particles *ghostParticles=nullptr);
 
     void dump2file(std::string filename);

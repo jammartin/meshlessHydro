@@ -50,11 +50,15 @@ void MeshlessScheme::run(){
         particles->compDensity(ghostParticles, config.kernelSize);
 #endif
 
-        Logger(DEBUG) << "      SANITY CHECK > V_tot = " << particles->sumVolume();
-        Logger(DEBUG) << "      SANITY CHECK > M_tot = " << particles->sumMass();
-
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
+
+        Logger(DEBUG) << "      SANITY CHECK > V_tot = " << particles->sumVolume();
+        Logger(DEBUG) << "      SANITY CHECK > M_tot = " << particles->sumMass();
+        Logger(DEBUG) << "      SANITY CHECK > E_tot = " << particles->sumEnergy();
+        Logger(DEBUG) << "      SANITY CHECK > px_tot = " << particles->sumMomentumX();
+        Logger(DEBUG) << "      SANITY CHECK > py_tot = " << particles->sumMomentumY();
+
 
         Logger(INFO) << "    > Computing gradients";
 #if PERIODIC_BOUNDARIES
@@ -102,11 +106,11 @@ void MeshlessScheme::run(){
         particles->compEffectiveFace(ghostParticles);
 #endif
         Logger(DEBUG) << "      > Computing fluxes";
-        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma);
+        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma);
 
 #if PERIODIC_BOUNDARIES
         Logger(DEBUG) << "      > Computing ghost fluxes";
-        particles->compRiemannFluxes(config.timeStep, config.kernelSize, config.gamma,
+        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma,
                                      ghostParticles);
         //Logger(DEBUG) << "Aborting for debugging.";
         //exit(6);

@@ -16,7 +16,7 @@ class Riemann {
 
 public:
     /// WR, WL and Aij must be pre-allocated
-    Riemann(double *WR, double *WL, double *Aij, int i);
+    Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i);
 
     /**
      * Solving a one-dimensional Riemann problem for an ideal gas
@@ -27,9 +27,9 @@ public:
 
 private:
     int i;
-    double *WR, *WL, *Aij; // *Fij;
+    double *WR, *WL, *vFrame, *Aij;
     double rhoSol, vSol[DIM], PSol;
-    double AijNorm, hatAij[DIM];
+    double hatAij[DIM];
     double unitX[DIM] = { 1, 0
 #if DIM==3
             ,0

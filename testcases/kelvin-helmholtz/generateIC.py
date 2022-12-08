@@ -26,9 +26,15 @@ def getVelsX(y):
     velsX[mask3] = .5-.5*np.exp((y[mask3]-.75)/Dy)
     mask4 = .75<y
     velsX[mask4] = -.5+.5*np.exp((.75-y[mask4])/Dy)
-
     return velsX
 
+def getVelsXTest(y):
+    velsX = np.empty(len(y))
+    mask1 = y<.5
+    velsX[mask1] = 1.
+    mask2 = y>=.5
+    velsX[mask2] = 1.
+    return velsX
 
 def getVelsY(x):
     return dvy0*np.sin(4.*np.pi*x)
@@ -84,9 +90,13 @@ if __name__=="__main__":
         pos = rng.random(size=(N, DIM))
 
     # set velocities
+    #vel = np.zeros(pos.shape)
     vel = np.empty(pos.shape)
     vel[:,0] = getVelsX(pos[:,1])
     vel[:,1] = getVelsY(pos[:,0])
+
+    #vel[:,0] = getVelsXTest(pos[:,1])
+
     # set densities
     rho = getDensities(pos[:,1])
     #rho = np.ones(pos.shape[0])
@@ -114,7 +124,7 @@ if __name__=="__main__":
     #plt.rc('text.latex', preamble=r'\usepackage{siunitx}\usepackage{nicefrac}')
 
     fig, ax = plt.subplots(figsize=(8,6), dpi=200)
-    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=1.)
+    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=100.)
     fig.colorbar(rhoPlt, ax=ax)
     plt.title(r"Color coded density $\rho$")
     plt.xlabel("$x$")

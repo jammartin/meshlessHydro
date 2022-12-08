@@ -4,10 +4,11 @@
 
 #include "../include/Riemann.h"
 
-Riemann::Riemann(double *WR, double *WL, double *Aij, int i) : WR { WR }, WL { WL }, Aij { Aij }, i { i }{
+Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i) :
+                    WR { WR }, WL { WL }, vFrame { vFrame },  Aij { Aij }, i { i }{
 
     // compute norm of effective face
-    AijNorm = sqrt(Helper::dotProduct(Aij, Aij));
+    double AijNorm = sqrt(Helper::dotProduct(Aij, Aij));
 
     hatAij[0] = 1./AijNorm*Aij[0];
     hatAij[1] = 1./AijNorm*Aij[1];
@@ -36,7 +37,7 @@ Riemann::Riemann(double *WR, double *WL, double *Aij, int i) : WR { WR }, WL { W
     //Logger(DEBUG) << "vR_unrot = [" << WR[2] << ", " << WR[3] << "], vL_unrot = ["
     //          <<  WL[2] << ", " << WL[3] << "]";
 
-    //if(i == 46){
+    //if(i == 204){
     //    Logger(DEBUG) <<  "rhoR = " << WR[0] << ", rhoL = " << WL[0]
     //                  << ", vR = [" << WR[2] << ", " << WR[3]
     //                  << "], vL = [" <<  WL[2] << ", " << WL[3]
@@ -89,9 +90,11 @@ void Riemann::exact(double *Fij, const double &gamma){
     if (flagLR == 1){
         // right state sampled
         vSol[1] = WR[3];
-    } else { // flagLR == -1
+    } else if (flagLR == -1){ // flagLR == -1
         // left state sampled
         vSol[1] = WL[3];
+    } else { // flagLR == 0
+        Logger(WARN) << "  > Vacuum state sampled. This is not expected.";
     }
 
     //if (i == 46){
@@ -123,16 +126,23 @@ void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
     vSol[0] = LambdaInv[0]*vSolBuf[0]+LambdaInv[1]*vSolBuf[1];
     vSol[1] = LambdaInv[2]*vSolBuf[0]+LambdaInv[3]*vSolBuf[1];
 
-    //if (i == 46){
+    //if (i == 204){
     //    Logger(DEBUG) << "rhoSol = " << rhoSol << ", vSol_rot = [" << vSol[0] << ", " << vSol[1] << "], PSol = " << PSol;
     //}
 
-    /// Compute fluxes projected in Aij direction
-    Fij[0] = hatAij[0]*rhoSol*vSol[0] + hatAij[1]*rhoSol*vSol[1]; // mass flux
-    Fij[2] = hatAij[0]*(rhoSol*vSol[0]*vSol[0]+PSol) + hatAij[1]*rhoSol*vSol[0]*vSol[1]; // vx flux
-    Fij[3] = hatAij[0]*rhoSol*vSol[0]*vSol[1] + hatAij[1]*(rhoSol*vSol[1]*vSol[1]+PSol); // vy flux
-    Fij[1] = hatAij[0]*vSol[0]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vSol, vSol) + PSol)
-            + hatAij[1]*vSol[1]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vSol, vSol) + PSol); // energy flux
+    /// Compute fluxes projected onto Aij
+    Fij[0] = Aij[0]*rhoSol*vSol[0] + Aij[1]*rhoSol*vSol[1]; // mass flux
+
+    // velocity solution in the lab frame
+    double vLab[DIM];
+    vLab[0] = vSol[0] + vFrame[0];
+    vLab[1] = vSol[1] + vFrame[1];
+
+    Fij[2] = Aij[0]*(rhoSol*vLab[0]*vSol[0]+PSol) + Aij[1]*rhoSol*vLab[0]*vSol[1]; // vx flux
+    Fij[3] = Aij[0]*rhoSol*vLab[1]*vSol[0] + Aij[1]*(rhoSol*vLab[1]*vSol[1]+PSol); // vy flux
+
+    Fij[1] = Aij[0]*(vSol[0]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vLab, vLab)) + PSol*vLab[0])
+            + Aij[1]*(vSol[1]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vLab, vLab)) + PSol*vLab[1]); // energy flux
 
     //double vFluxBuf[DIM] = { Fij[2], Fij[3] };
     //Fij[2] = LambdaInv[0]*vFluxBuf[0]+LambdaInv[1]*vFluxBuf[1];
