@@ -31,6 +31,15 @@
 *.out
 *.app
 
+# Executable folder
+bin/
+
+# Header only libraries
+holib/
+
+# Output files
+output/
+
 # JetBrains projject files
 .idea
 # emacs autosave files

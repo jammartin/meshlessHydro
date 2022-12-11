@@ -634,8 +634,6 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
     }
 }
 
-
-//TODO: remove ghost particles as argument, only used for debugging
 void Particles::solveRiemannProblems(const double &gamma, const Particles &ghostParticles){
     for (int i=0; i<N; ++i){
 
@@ -690,7 +688,6 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
             }
 #endif
             if (compute){
-                //Riemann solver { WijR[ii], WijL[ii], vFrame[ii], Aij[ii] , i };
                 Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii] , i };
                 solver.exact(Fij[ii], gamma);
             } else {
@@ -740,7 +737,6 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 #endif
 
             if (compute) {
-                //Riemann solver{WijRGhosts[ii], WijLGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], i};
                 Riemann solver{WijLGhosts[ii], WijRGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], i};
                 solver.exact(FijGhosts[ii], gamma);
             } else {
@@ -903,10 +899,10 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 
 #if MOVE_PARTICLES
         // MOVE PARTICLES
-        //x[i] += .5*(vx[i]+vxi)*dt;
-        //y[i] += .5*(vy[i]+vyi)*dt;
-        x[i] += vxi*dt;
-        y[i] += vyi*dt;
+        x[i] += .5*(vx[i]+vxi)*dt;
+        y[i] += .5*(vy[i]+vyi)*dt;
+        //x[i] += vxi*dt;
+        //y[i] += vyi*dt;
 #if DIM==3
         z[i] += .5*(vz[i]+vzi)*dt;
 #endif

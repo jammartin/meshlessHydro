@@ -1,5 +1,7 @@
 # meshlessHydro
-Implementing a meshless scheme for hydrodynamic particle simulations as described implemented in [GIZMO](http://www.tapir.caltech.edu/~phopkins/Site/GIZMO.html).
+Implementing a meshless scheme for hydrodynamic particle simulations as described implemented in [GIZMO](http://www.tapir.caltech.edu/~phopkins/Site/GIZMO.html). Below a Kelvin-Helmholtz testcase with 10000 particles simulated with the **meshless finite volume (MFV)** algorithm is shown.
+
+<img src="media/KH_N10000.gif" alt="Kelvin-Helmholtz testcase" width="100%"/>
 
 ## Implementation roadmap
 
@@ -28,10 +30,11 @@ An exact Riemann solver taken from [this repository](https://github.com/bwvdnbro
 ### File tree
 ```
 ├── LICENSE
-├── README.md (this file)
+├── README.md
 ├── demonstrator
 │   ├── Makefile
 │   ├── config.info
+│   ├── debugLog.txt
 │   ├── include
 │   │   ├── ConfigParser.h
 │   │   ├── Domain.h
@@ -42,28 +45,33 @@ An exact Riemann solver taken from [this repository](https://github.com/bwvdnbro
 │   │   ├── Particles.h
 │   │   ├── Riemann.h
 │   │   └── parameter.h
+│   ├── log
 │   └── src
-│       ├── ConfigParser.cpp
-│       ├── Domain.cpp
-│       ├── Helper.cpp
-│       ├── InitialDistribution.cpp
-│       ├── Logger.cpp
-│       ├── MeshlessScheme.cpp
-│       ├── Particles.cpp
-│       ├── Riemann.cpp
-│       └── main.cpp
+│       ├── ConfigParser.cpp
+│       ├── Domain.cpp
+│       ├── Helper.cpp
+│       ├── InitialDistribution.cpp
+│       ├── Logger.cpp
+│       ├── MeshlessScheme.cpp
+│       ├── Particles.cpp
+│       ├── Riemann.cpp
+│       └── main.cpp
 ├── media
+│   ├── KH_N10000.gif
 │   └── volumePartition.png
 ├── snippets
 │   └── volumePartition
+│       ├── volumePartition.png
 │       └── volumePartition.py
-└── testcases
-    ├── kelvin-helmholtz
-    │   ├── densityPlotter.py
-    │   └── generateIC.py
-    └── sedov
-        ├── initial_sedov.py
-        └── sedov_N61.h5
+├── testcases
+│   ├── kelvin-helmholtz
+│   │   ├── densityPlotter.py
+│   │   └── generateIC.py
+│   └── sedov
+│       ├── initial_sedov.py
+│       └── sedov_N61.h5
+└── tools
+    └── plotInteraction.py
 ```
 ### Directories
 
@@ -75,9 +83,12 @@ An exact Riemann solver taken from [this repository](https://github.com/bwvdnbro
 ## Demonstrator 
 
 The C++ program in the folder demonstrator can be build with the given `Makefile`. To install the necessary header-only libraries you can run the command `make install`.
-The following prerequisites mus be installed manually:
 
-- 
+The following prerequisites must be installed manually:
+
+- [HDF5](https://www.hdfgroup.org/solutions/hdf5/) for file-I/O
+- [Boost property tree](https://www.boost.org/doc/libs/1_65_1/doc/html/property_tree.html) for configuration file parsing
+
 
 ## Visualization
 

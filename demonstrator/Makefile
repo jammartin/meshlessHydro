@@ -90,6 +90,8 @@ prepare-run:
 install: prepare-run | $(HOLIB)
 	@echo "Downloading cxxopts.hpp into holib/ ..."
 	curl https://raw.githubusercontent.com/jarro2783/cxxopts/master/include/cxxopts.hpp -o $(HOLIB)/cxxopts.hpp
+	@echo "Downloading RiemannSolver.hpp into holib/ ..."
+	curl https://raw.githubusercontent.com/bwvdnbro/python_finite_volume_solver/master/RiemannSolver.hpp -o $(HOLIB)/RiemannSolver.hpp
 	@echo "... done. Downloading HighFive as zip-file ..."
 	@mkdir tmp
 	curl https://github.com/BlueBrain/HighFive/archive/refs/heads/master.zip -L -o tmp/HighFive.zip
