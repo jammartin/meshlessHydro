@@ -24,9 +24,6 @@
 /// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
 #define BETA 4.
 
-/// use first order quadrature point for Riemann problems
-#define FIRST_ORDER_QUAD_POINT 1
-
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
 
@@ -39,6 +36,9 @@
  * 2: dump NNL and ghosts to files
 **/
 #define DEBUG_LVL 1
+
+/// use first order quadrature point for Riemann problems
+#define FIRST_ORDER_QUAD_POINT 1
 
 /// define verbosity for each VERBOSITY_PARTICLES particles
 // TODO: use this flag when debug level 1

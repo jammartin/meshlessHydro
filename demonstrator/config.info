@@ -11,7 +11,7 @@ timeStep .005
 timeEnd 5.
 
 ; output particle distribution each h5DumpInterval steps
-h5DumpInterval 10
+h5DumpInterval 5
 
 ; periodic boundaries of box
 ; ignored when PERIODIC_BOUNDARIES is not set in parameter.h
@@ -26,7 +26,7 @@ periodicBoxLimits {
 
 // TODO: this is implemented as half the kernel size
 ; kernel size for meshless scheme
-kernelSize .07
+kernelSize .04
 
 ; adiabatic index
 gamma 1.6666666666666667

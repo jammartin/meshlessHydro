@@ -18,15 +18,15 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=500.) # good for ~100 particles
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=200.) # good for ~400 particles
     #rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=100.) # good for ~900 particles
-    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=10.) # good for 10**4 particles
+    rhoPlt = ax.scatter(pos[:,0], pos[:,1], c=rho, s=20.) # good for 10**4 particles
 
     #PPlt = ax.scatter(pos[:,0], pos[:,1], c=P, s=200.) # good for ~400 particles
     
     if "Ghosts" not in str(h5File):
-        ax.set_xlim((-.75, .75))
-        ax.set_ylim((-.75, .75))
-        #ax.set_xlim((-.6, .6))
-        #ax.set_ylim((-.6, .6))
+        #ax.set_xlim((-.75, .75))
+        #ax.set_ylim((-.75, .75))
+        ax.set_xlim((-.5, .5))
+        ax.set_ylim((-.5, .5))
     
     # Plot gradient
     if plotGrad and not plotVel:
