@@ -44,3 +44,8 @@ output/
 .idea
 # emacs autosave files
 *~
+
+# Generated outpuzt files
+*.h5
+*.png
+*.mp4
