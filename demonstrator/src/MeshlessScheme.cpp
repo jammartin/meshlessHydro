@@ -121,7 +121,7 @@ void MeshlessScheme::run(){
             Logger(INFO) << "   > Dump particle distribution";
             stepss << std::setw(6) << std::setfill('0') << step;
             Logger(INFO) << "      > Dump particles to file";
-            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"), t);
 
 #if DEBUG_LVL > 1
 #if PERIODIC_BOUNDARIES
@@ -137,8 +137,14 @@ void MeshlessScheme::run(){
             break;
         }
 
+
         Logger(INFO) << "    > Solving Riemann problems";
+#if PERIDOIC_BOUNDARIES
         particles->solveRiemannProblems(config.gamma, ghostParticles);
+#else
+        Particles ghostParticles { 0, true }; // DUMMY
+        particles->solveRiemannProblems(config.gamma, ghostParticles);
+#endif
 
 #if DEBUG_LVL
         Logger(DEBUG) << "    > Checking flux symmetry";

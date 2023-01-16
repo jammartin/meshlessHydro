@@ -21,8 +21,8 @@ class Helper {
 
 public:
     void inverseMatrix(double *A, int N);
-    static double dotProduct(double *a, double*b);
-
+    static double dotProduct(double *a, double *b);
+    static void crossProduct(double *a, double *b, double *crossProduct);
 
     /**
      * good resource for 3D implementation: https://math.stackexchange.com/a/897677
@@ -33,6 +33,8 @@ public:
      *             indexed lambda_ij = Lambda[j+DIM*i], DIM=2
      */
     static void rotationMatrix2D(double *a, double *b, double *Lambda);
+
+    static void rotationMatrix3D(double *a, double *b, double *Lambda);
 
 private:
     double WORK[DIM*DIM];

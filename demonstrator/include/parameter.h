@@ -6,10 +6,10 @@
 #define DEMONSTRATOR_PARAMETER_H
 
 /// possible values 2 or 3 for 2D or 3D simulations
-#define DIM 2
+#define DIM 3
 
 /// define if periodic boundaries should be employed
-#define PERIODIC_BOUNDARIES 1
+#define PERIODIC_BOUNDARIES 0
 
 /// maximum number of interactions for each particle
 #define MAX_NUM_INTERACTIONS 400
@@ -27,7 +27,7 @@
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
 
-/// define is particles should move, otherwise a fixed grid is used
+/// define if particles should move, otherwise a fixed grid is used
 #define MOVE_PARTICLES 1
 
 /** define debug level to enable additional output:

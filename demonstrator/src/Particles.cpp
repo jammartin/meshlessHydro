@@ -72,9 +72,9 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
         WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
         FijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
         vFrameGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
-#endif
     } else {
         parent = new int[numParticles]; // store index of original node
+#endif
     }
 }
 
@@ -122,11 +122,54 @@ Particles::~Particles() {
         delete[] ghostMap;
         delete[] FijGhosts;
         delete[] vFrameGhosts;
-#endif
     } else {
         delete[] parent;
+#endif
     }
 }
+
+#if !PERIODIC_BOUNDARIES
+void Particles::getDomainLimits(double *domainLimits){
+
+    double minX { std::numeric_limits<double>::max() };
+    double maxX { std::numeric_limits<double>::min() };
+    double minY { std::numeric_limits<double>::max() };
+    double maxY { std::numeric_limits<double>::min() };
+#if DIM == 3
+    double minZ { std::numeric_limits<double>::max() };
+    double maxZ { std::numeric_limits<double>::min() };
+#endif
+
+    for(int i=0; i<N; ++i){
+        if (x[i] < minX){
+            minX = x[i];
+        } else if (x[i] > maxX){
+            maxX = x[i];
+        }
+        if (y[i] < minY){
+            minY = y[i];
+        } else if (y[i] > maxY){
+            maxY = y[i];
+        }
+#if DIM == 3
+        if (z[i] < minZ){
+            minZ = z[i];
+        } else if (z[i] > maxZ){
+            maxZ = z[i];
+        }
+#endif
+    }
+
+    domainLimits[0] = minX;
+    domainLimits[DIM] = maxX;
+    domainLimits[1] = minY;
+    domainLimits[DIM+1] = maxY;
+#if DIM == 3
+    domainLimits[2] = minZ;
+    domainLimits[DIM+2] = maxZ;
+#endif
+}
+#endif
 
 void Particles::assignParticlesAndCells(Domain &domain){
 
@@ -148,9 +191,17 @@ void Particles::assignParticlesAndCells(Domain &domain){
             floorY -= 1;
         }
 
+#if DIM==3
+        int floorZ = floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ);
+        if (floorZ == domain.cellsZ){
+            floorZ -= 1;
+        }
+#endif
+
+
         int iGrid = floorX + floorY * domain.cellsX
 #if DIM == 3
-        + floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ) * domain.cellsX * domain.cellsY
+        + floorZ * domain.cellsX * domain.cellsY
 #endif
         ;
 
@@ -164,7 +215,10 @@ void Particles::assignParticlesAndCells(Domain &domain){
         //          << ", floor y = " << floorY;
 
         //Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
-        //          << "] to cell " << iGrid;
+//#if DIM == 3
+//                      << ", " << z[i]
+//#endif
+//                      << "] to cell " << iGrid;
         domain.grid[iGrid].prtcls.push_back(i);
         cell[i] = iGrid; // assign cells to particles
     }
@@ -295,6 +349,9 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
 
             xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
             xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#if DIM == 3
+            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#endif
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] = 0.;
@@ -404,10 +461,13 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
+#if FIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + z[j])/2.;
+#else
             //xij[2] = z[i] + kernelSize/2. * (z[j] - z[i]);
             xij[2] = z[i] + kernelSize/4. * (z[j] - z[i]);
+#endif
             xijxi[2] = xij[2] - z[i];
-            // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
             if (psiMaxNgb < f[j]) psiMaxNgb = f[j];
             if (psiMinNgb > f[j]) psiMinNgb = f[j];
@@ -435,11 +495,13 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
             //xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
-
+#if FIRSTFIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + ghostParticles->z[j])/2.;
+#else
             xij[2] = z[i] + kernelSize/4. * (ghostParticles->z[j] - z[i]);
+#endif
 
             xijxi[2] = xij[2] - z[i];
-            // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
             if (psiMaxNgb < fGhost[j]) psiMaxNgb = fGhost[j];
             if (psiMinNgb > fGhost[j]) psiMinNgb = fGhost[j];
@@ -518,6 +580,11 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #endif
 
 #if DIM==3
+#if FIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + z[j])/2.;
+            xijxj[2] = .5*(z[i] - z[j]);
+            xijxi[2] = .5*(z[j] - z[i]);
+#else
             xjxi[2] = z[j] - z[i];
             //xij[2] = z[i] + kernelSize/2. * xjxi[2];
 
@@ -525,7 +592,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 
             xijxi[2] = xij[2] - z[i];
             xijxj[2] = xij[2] - z[j];
-            // TODO: add FIRST_ORDER_QUAD_POINT
+#endif
 #endif
 
             int iW = i*MAX_NUM_INTERACTIONS+jn;
@@ -608,19 +675,36 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             viDiv += vzGrad[i][2];
             vjDiv += vzGrad[j][2];
 #endif
+            // density
             WijR[iW][0] -= dt/2. * (rho[i] * viDiv + (vx[i]-vFrame[iW][0])*rhoGrad[i][0] + (vy[i]-vFrame[iW][1])*rhoGrad[i][1]);
             WijL[iW][0] -= dt/2. * (rho[j] * vjDiv + (vx[j]-vFrame[iW][0])*rhoGrad[j][0] + (vy[j]-vFrame[iW][1])*rhoGrad[j][1]);
+
+            // energy
             WijR[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrame[iW][0])*PGrad[i][0] + (vy[i]-vFrame[iW][1])*PGrad[i][1]);
             WijL[iW][1] -= dt/2. * (gamma*P[j] * vjDiv + (vx[j]-vFrame[iW][0])*PGrad[j][0] + (vy[j]-vFrame[iW][1])*PGrad[j][1]);
-            // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff)
+
+            // velocities
+            // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff) ??
             WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*vxGrad[i][0] + (vy[i]-vFrame[iW][1])*vxGrad[i][1]);
             WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[i]-vFrame[iW][1])*vxGrad[j][1]);
             WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vx[i]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[i][1]);
             WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[j][1]);
 #if DIM==3
-            // TODO: update below for 3D
-            WijR[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
-            WijL[iW][4] -= dt/2. * PGrad[j][2]/rho[j];
+            // density
+            WijR[iW][0] -= dt/2. * (vz[i]-vFrame[iW][2])*rhoGrad[i][2];
+            WijL[iW][0] -= dt/2. * (vz[j]-vFrame[iW][2])*rhoGrad[j][2];
+
+            // energy
+            WijR[iW][1] -= dt/2. * (vz[i]-vFrame[iW][2])*PGrad[i][2];
+            WijL[iW][1] -= dt/2. * (vz[j]-vFrame[iW][2])*PGrad[j][2];
+
+            // velocities
+            WijR[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[i][2];
+            WijL[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[j][2];
+            WijR[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[i][2];
+            WijL[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[j][2];
+            WijR[iW][4] -= dt/2. * (PGrad[i][2]/rho[i] + (vx[i]-vFrame[iW][0])*vzGrad[i][0] + (vy[i]-vFrame[iW][1])*vzGrad[i][1] + (vz[i]-vFrame[iW][2])*vzGrad[i][2]);
+            WijL[iW][4] -= dt/2. * (PGrad[j][2]/rho[j] + (vx[j]-vFrame[iW][0])*vzGrad[i][0] + (vy[i]-vFrame[iW][1])*vzGrad[j][1] + (vz[j]-vFrame[iW][2])*vzGrad[j][2]);
 #endif
 
             //if (i == 46){// && jn == 28){
@@ -781,8 +865,7 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
             vF[i][0] += Fij[ii][2];
             vF[i][1] += Fij[ii][3];
-
-            // TODO: implement z-component to work for 3D
+            vF[i][2] += Fij[ii][4];
 
             /// ENERGY FLUXES
             // allocate buffer for energy update
@@ -1766,7 +1849,7 @@ void Particles::checkFluxSymmetry(Particles *ghostParticles){
     }
 }
 
-void Particles::dump2file(std::string filename){
+void Particles::dump2file(std::string filename, double simTime){
     // open output file
     HighFive::File h5File { filename, HighFive::File::ReadWrite |
                                       HighFive::File::Create |
@@ -1778,6 +1861,8 @@ void Particles::dump2file(std::string filename){
     dataSpaceDims[1] = DIM;
 
     // create datasets
+    // TODO: Create a h5 object holding all meta data
+    HighFive::DataSet timeDataSet = h5File.createDataSet<double>("/time", HighFive::DataSpace(1));
     HighFive::DataSet rhoDataSet = h5File.createDataSet<double>("/rho", HighFive::DataSpace(N));
     HighFive::DataSet mDataSet = h5File.createDataSet<double>("/m", HighFive::DataSpace(N));
     HighFive::DataSet uDataSet = h5File.createDataSet<double>("/u", HighFive::DataSpace(N));
@@ -1785,12 +1870,16 @@ void Particles::dump2file(std::string filename){
     HighFive::DataSet velDataSet = h5File.createDataSet<double>("/v", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet rhoGradDataSet = h5File.createDataSet<double>("/rhoGrad", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet PDataSet = h5File.createDataSet<double>("/P", HighFive::DataSpace(N));
+    HighFive::DataSet noiDataSet = h5File.createDataSet<int>("/noi", HighFive::DataSpace(N));
+
 
     // containers for particle data
+    std::vector<double> timeVec({ simTime });
     std::vector<double> rhoVec(rho, rho+N);
     std::vector<double> mVec(m, m+N);
     std::vector<double> uVec(u, u+N);
     std::vector<double> PVec(P, P+N);
+    std::vector<int> noiVec(noi, noi+N);
 
     std::vector<std::vector<double>> posVec(N);
     std::vector<std::vector<double>> velVec(N);
@@ -1828,10 +1917,12 @@ void Particles::dump2file(std::string filename){
         rhoGradVec[i] = rhoGradBuf;
     }
     // write data
+    timeDataSet.write(timeVec); // dummy vec containing one element
     rhoDataSet.write(rhoVec);
     mDataSet.write(mVec);
     uDataSet.write(uVec);
     PDataSet.write(PVec);
+    noiDataSet.write(noi);
     posDataSet.write(posVec);
     velDataSet.write(velVec);
     rhoGradDataSet.write(rhoGradVec);

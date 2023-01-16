@@ -25,7 +25,7 @@ public:
         Cell() : minX { 0. }, maxX { 0. },
                  minY { 0. }, maxY { 0. }
 #if DIM == 3
-                ,minZ { 0.] }, maxZ { 0. }
+                ,minZ { 0. }, maxZ { 0. }
 #endif
                  {}
 
@@ -64,13 +64,13 @@ public:
     // number of grid cells in each dimension
     double cellSizeX { 0 }, cellSizeY { 0 };
 #if DIM == 3
-    int cellsSizeZ { 0 };
+    double cellSizeZ { 0 };
 #endif
 private:
     int (*dimIndex)[DIM] { nullptr };
-/*#if PERIODIC_BOUNDARIES
-    int (*ghostDimIndex)[DIM] { nullptr };
-#endif*/
+//#if PERIODIC_BOUNDARIES
+//    int (*ghostDimIndex)[DIM] { nullptr };
+//#endif
 };
 
 

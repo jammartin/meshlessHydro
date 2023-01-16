@@ -37,7 +37,7 @@ private:
     };
 
     void rotateAndProjectFluxes2D(double *Fij, const double &gamma);
-
+    void rotateAndProjectFluxes3D(double *Fij, const double &gamma);
 };
 
 

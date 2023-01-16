@@ -71,8 +71,8 @@ public:
     void dumpNNL(std::string filename, const Particles &ghostParticles);
 
     void printNoi();
-
-
+#else
+    void getDomainLimits(double *domainLimits);
 #endif
 
     /// function to move particles for testing purposes
@@ -86,7 +86,7 @@ public:
     double sumMomentumY();
     void checkFluxSymmetry(Particles *ghostParticles=nullptr);
 
-    void dump2file(std::string filename);
+    void dump2file(std::string filename, double simTime);
 
 private:
     int *nnl; // nearest neighbor list

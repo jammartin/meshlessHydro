@@ -45,7 +45,10 @@ output/
 # emacs autosave files
 *~
 
-# Generated outpuzt files
+# Generated output files
 *.h5
 *.png
 *.mp4
+
+# Python cache files
+__pycache__/
