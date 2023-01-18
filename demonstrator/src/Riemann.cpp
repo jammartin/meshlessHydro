@@ -63,8 +63,12 @@ Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i) :
 #else
     Helper::rotationMatrix3D(hatAij, unitX, Lambda);
 
+    //Logger(DEBUG) << "Lambda = [" << Lambda[0] << ", " << Lambda[1] << ", " << Lambda[2];
+    //Logger(DEBUG) << "          " << Lambda[3] << ", " << Lambda[4] << ", " << Lambda[5];
+    //Logger(DEBUG) << "          " << Lambda[6] << ", " << Lambda[7] << ", " << Lambda[8] << "]";
+
     double vBufR[DIM] = { WR[2], WR[3], WR[4] };
-    double vBufL[DIM] = { WL[2], WL[3], WR[4] };
+    double vBufL[DIM] = { WL[2], WL[3], WL[4] };
 
     WR[2] = Lambda[0]*vBufR[0]+Lambda[1]*vBufR[1]+Lambda[2]*vBufR[2];
     WR[3] = Lambda[3]*vBufR[0]+Lambda[4]*vBufR[1]+Lambda[5]*vBufR[2];

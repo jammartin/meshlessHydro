@@ -84,6 +84,9 @@ public:
     double sumEnergy();
     double sumMomentumX();
     double sumMomentumY();
+#if DIM==3
+    double sumMomentumZ();
+#endif
     void checkFluxSymmetry(Particles *ghostParticles=nullptr);
 
     void dump2file(std::string filename, double simTime);

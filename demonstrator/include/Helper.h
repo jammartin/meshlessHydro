@@ -5,7 +5,10 @@
 #ifndef MESHLESSHYDRO_HELPER_H
 #define MESHLESSHYDRO_HELPER_H
 
+#include <cmath>
+
 #include "parameter.h"
+#include "Logger.h"
 
 /// Matrix inversion taken from: https://stackoverflow.com/a/3525136/6208997
 

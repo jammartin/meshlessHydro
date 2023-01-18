@@ -24,6 +24,16 @@ void MeshlessScheme::run(){
 
     do {
         Logger(INFO) << "  > TIME: " << t << ", STEP: " << step;
+#if !PERIODIC_BOUNDARIES
+        Logger(INFO) << "    > Computing domain limits ...";
+        double domainLimits[DIM*2];
+        particles->getDomainLimits(domainLimits);
+        Domain::Cell boundingBox { domainLimits };
+        domain.bounds = boundingBox;
+        Logger(DEBUG) << "      > ... creating grid ...";
+        domain.createGrid(config.kernelSize);
+        Logger(INFO) << "    > ... done.";
+#endif
         Logger(INFO) << "    > Assigning particles ...";
         particles->assignParticlesAndCells(domain);
         Logger(INFO) << "    > ... done.";
@@ -58,6 +68,9 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      SANITY CHECK > E_tot = " << particles->sumEnergy();
         Logger(DEBUG) << "      SANITY CHECK > px_tot = " << particles->sumMomentumX();
         Logger(DEBUG) << "      SANITY CHECK > py_tot = " << particles->sumMomentumY();
+#if DIM == 3
+        Logger(DEBUG) << "      SANITY CHECK > pz_tot = " << particles->sumMomentumZ();
+#endif
 
 
         Logger(INFO) << "    > Computing gradients";

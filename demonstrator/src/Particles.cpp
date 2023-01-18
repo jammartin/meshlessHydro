@@ -4,13 +4,15 @@
 
 #include "../include/Particles.h"
 
-//TODO: add for 3 dimensions
 double Kernel::cubicSpline(const double &r, const double &h) {
 
     // TODO: remove this
     double h2 = h/2.;
-
+#if DIM == 2
     const double sigma = 10./(7.*M_PI*h2*h2);
+#else // DIM == 3
+    const double sigma = 1./(M_PI*h2*h2*h2);
+#endif
     const double q = r/h2;
     if (0. <= q && q <= 1.){
         return sigma*(1.-3./2.*q*q*(1.-q/2.));
@@ -36,7 +38,6 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
     rhoGrad = new double[numParticles][DIM];
     vxGrad = new double[numParticles][DIM];
     vyGrad = new double[numParticles][DIM];
-    vzGrad = new double[numParticles][DIM];
     PGrad = new double[numParticles][DIM];
 
 
@@ -45,6 +46,7 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
 #if DIM == 3
     z = new double[numParticles];
     vz = new double[numParticles];
+    vzGrad = new double[numParticles][DIM];
 #endif
     omega = new double[numParticles];
     if (!ghosts){
@@ -92,7 +94,6 @@ Particles::~Particles() {
     delete[] rhoGrad;
     delete[] vxGrad;
     delete[] vyGrad;
-    delete[] vzGrad;
     delete[] PGrad;
     delete[] omega;
 
@@ -108,6 +109,7 @@ Particles::~Particles() {
 #if DIM == 3
         delete[] z;
         delete[] vz;
+        delete[] vzGrad;
 #endif
         delete[] nnl;
         delete[] noi;
@@ -494,10 +496,10 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
-            //xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
-#if FIRSTFIRST_ORDER_QUAD_POINT
+#if FIRST_ORDER_QUAD_POINT
             xij[2] = (z[i] + ghostParticles->z[j])/2.;
 #else
+            //xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
             xij[2] = z[i] + kernelSize/4. * (ghostParticles->z[j] - z[i]);
 #endif
 
@@ -686,9 +688,9 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             // velocities
             // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff) ??
             WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*vxGrad[i][0] + (vy[i]-vFrame[iW][1])*vxGrad[i][1]);
-            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[i]-vFrame[iW][1])*vxGrad[j][1]);
+            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[j]-vFrame[iW][1])*vxGrad[j][1]);
             WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vx[i]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[i][1]);
-            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[j][1]);
+            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[j][0] + (vy[j]-vFrame[iW][1])*vyGrad[j][1]);
 #if DIM==3
             // density
             WijR[iW][0] -= dt/2. * (vz[i]-vFrame[iW][2])*rhoGrad[i][2];
@@ -704,7 +706,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             WijR[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[i][2];
             WijL[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[j][2];
             WijR[iW][4] -= dt/2. * (PGrad[i][2]/rho[i] + (vx[i]-vFrame[iW][0])*vzGrad[i][0] + (vy[i]-vFrame[iW][1])*vzGrad[i][1] + (vz[i]-vFrame[iW][2])*vzGrad[i][2]);
-            WijL[iW][4] -= dt/2. * (PGrad[j][2]/rho[j] + (vx[j]-vFrame[iW][0])*vzGrad[i][0] + (vy[i]-vFrame[iW][1])*vzGrad[j][1] + (vz[j]-vFrame[iW][2])*vzGrad[j][2]);
+            WijL[iW][4] -= dt/2. * (PGrad[j][2]/rho[j] + (vx[j]-vFrame[iW][0])*vzGrad[j][0] + (vy[j]-vFrame[iW][1])*vzGrad[j][1] + (vz[j]-vFrame[iW][2])*vzGrad[j][2]);
 #endif
 
             //if (i == 46){// && jn == 28){
@@ -865,7 +867,9 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
             vF[i][0] += Fij[ii][2];
             vF[i][1] += Fij[ii][3];
+#if DIM==3
             vF[i][2] += Fij[ii][4];
+#endif
 
             /// ENERGY FLUXES
             // allocate buffer for energy update
@@ -975,7 +979,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         // UPDATE INTERNAL ENERGY
         Q[0] -= dt*eF[i];
 #if DIM==3
-        u[i] = (Q[0]-.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]))/m[i];
+        u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]);
 #else
         u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]);
 #endif
@@ -1765,6 +1769,16 @@ double Particles::sumMomentumY(){
     }
     return momY;
 }
+
+#if DIM == 3
+double Particles::sumMomentumZ(){
+    double momZ = 0.;
+    for (int i=0; i<N; ++i){
+        momZ += m[i]*vz[i];
+    }
+    return momZ;
+}
+#endif
 
 void Particles::checkFluxSymmetry(Particles *ghostParticles){
     for (int i=0; i<N; ++i){
