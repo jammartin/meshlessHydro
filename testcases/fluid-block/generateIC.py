@@ -9,7 +9,7 @@ DIM = 3
 
 if __name__=="__main__":
 
-    parser = argparse.ArgumentParser(description="Create an initial condition HDF5 file for a 2D Kelvin-Helmholtz test case.")
+    parser = argparse.ArgumentParser(description="Create an initial condition HDF5 file for a 3D fluid-block  test case.")
     parser.add_argument("--numParticles", "-N", metavar="int", type=int, help="number of particles", required=True)
     
     args = parser.parse_args()
@@ -42,7 +42,7 @@ if __name__=="__main__":
     # volume is 1
     m = rho/N
     # create specific internal energy
-    u = np.ones(rho.shape)
+    u = np.ones(rho.shape)*10000
     
     outH5.create_dataset("x", data=pos) 
     outH5.create_dataset("v", data=vel)

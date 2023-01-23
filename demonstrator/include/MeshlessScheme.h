@@ -34,6 +34,7 @@ public:
 
 private:
     Configuration config;
+    double timeStep;
     Particles *particles;
 #if PERIODIC_BOUNDARIES
     Particles ghostParticles;

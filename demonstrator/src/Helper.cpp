@@ -44,6 +44,7 @@ void Helper::rotationMatrix2D(double *a, double *b, double *Lambda){
     Lambda[3] = Lambda[0];
 }
 
+#if DIM==3
 void Helper::rotationMatrix3D(double *a, double *b, double *Lambda){
     double v[DIM];
     crossProduct(a, b, v);
@@ -71,3 +72,4 @@ void Helper::rotationMatrix3D(double *a, double *b, double *Lambda){
     //    Logger(DEBUG) << "          " << Lambda[6] << ", " << Lambda[7] << ", " << Lambda[8] << "]";
     //}
 }
+#endif

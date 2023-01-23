@@ -35,9 +35,11 @@ private:
             ,0
 #endif
     };
-
+#if DIM==2
     void rotateAndProjectFluxes2D(double *Fij, const double &gamma);
+#else
     void rotateAndProjectFluxes3D(double *Fij, const double &gamma);
+#endif
 };
 
 

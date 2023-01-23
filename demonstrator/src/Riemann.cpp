@@ -140,6 +140,7 @@ void Riemann::exact(double *Fij, const double &gamma){
 #endif
 }
 
+#if DIM==2
 void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
 
     // rotate back velocities to simulation coordinate frame
@@ -179,6 +180,7 @@ void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
 
 }
 
+#else
 void Riemann::rotateAndProjectFluxes3D(double *Fij, const double &gamma){
 
     // rotate back velocities to simulation coordinate frame
@@ -211,9 +213,6 @@ void Riemann::rotateAndProjectFluxes3D(double *Fij, const double &gamma){
              + Aij[1]*(vSol[1]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vLab, vLab)) + PSol*vLab[1])
              + Aij[2]*(vSol[2]*(PSol/(gamma-1.)+rhoSol*.5*Helper::dotProduct(vLab, vLab)) + PSol*vLab[2]); // energy flux
 
-    //double vFluxBuf[DIM] = { Fij[2], Fij[3] };
-    //Fij[2] = LambdaInv[0]*vFluxBuf[0]+LambdaInv[1]*vFluxBuf[1];
-    //Fij[3] = LambdaInv[2]*vFluxBuf[0]+LambdaInv[3]*vFluxBuf[1];
-
 }
+#endif
 

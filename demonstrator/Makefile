@@ -84,7 +84,6 @@ include $(DEPENDS)
 
 prepare-run:
 	@mkdir -p output
-	@mkdir -p log
 
 # build module as shared library and install it on your system
 install: prepare-run | $(HOLIB)

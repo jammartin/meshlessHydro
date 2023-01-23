@@ -544,6 +544,48 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
     }
 }
 
+double Particles::compGlobalTimestep(const double &gamma, const double &kernelSize){
+    double dt_ = std::numeric_limits<double>::max();
+    for (int i=0; i<N; ++i){
+
+        double vSig = std::numeric_limits<double>::min();
+        double ci = sqrt(gamma*P[i]/rho[i]); // soundspeed @i
+
+        // searching for maximum signal speed
+        for (int jn=0; jn<noi[i]; ++jn){
+            int j = nnl[i*MAX_NUM_INTERACTIONS+jn];
+
+            double cj = sqrt(gamma*P[j]/rho[j]); // soundspeed @j
+
+            double xij[DIM], vij[DIM];
+
+            xij[0] = x[i] - x[j];
+            xij[1] = y[i] - y[j];
+
+            vij[0] = vx[i] - vx[j];
+            vij[1] = vy[i] - vy[j];
+
+#if DIM == 3
+            xij[2] = z[i] - z[j];
+            vij[2] = vz[i] - vz[j];
+#endif
+            double vijxij = Helper::dotProduct(vij, xij)/sqrt(Helper::dotProduct(xij, xij));
+            vijxij = vijxij < 0. ? vijxij : 0.;
+
+            double vSig_i = ci+cj-vijxij;
+            vSig = vSig_i > vSig ? vSig_i : vSig;
+
+        }
+
+        // TODO: Note: Kernel size is double the actual kernel size
+        double dt = CFL*kernelSize/vSig;
+        dt_ = dt < dt_ ? dt : dt_;
+    }
+
+    return dt_;
+}
+
+
 void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma){
     for (int i=0; i<N; ++i){
         double xij[DIM];
@@ -751,7 +793,12 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                 Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
                               << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
                               << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
-                              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
+                              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1]
+#if DIM ==3
+                              << ", " << Aij[ii][2]
+#endif
+                              << "]";
+
 #if DEBUG_LVL
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
@@ -964,6 +1011,10 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 
         // UPDATE MASS
         m[i] -= dt*mF[i];
+        if (m[i] <= 0.){
+            Logger(ERROR) << "Negative mass. m[" << i << "] =" << m[i] << ", mF = " << mF[i];
+            //m[i] = MASS_FLOOR;
+        }
 
         // UPDATE VELOCITY
         Q[1] -= dt*vF[i][0];
@@ -975,14 +1026,23 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         vy[i] = Q[2]/m[i];
 #if DIM==3
         vz[i] = Q[3]/m[i];
+        //Logger(DEBUG) << "New velocity v = [" << vx[i] << ", " << vy[i] << ", " << vz[i] << "]";
 #endif
         // UPDATE INTERNAL ENERGY
         Q[0] -= dt*eF[i];
 #if DIM==3
         u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]);
+
+        //Logger(DEBUG) << "Total energy Q_E = " << Q[0] << ", kinetic energy E_kin = "
+        //          << .5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]);
+
 #else
         u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]);
 #endif
+        if (u[i] <= 0.){
+            Logger(ERROR) << "Negative internal energy. u[" << i << "] =" << u[i] << ", eF = " << eF[i];
+            //u[i] = ENERGY_FLOOR;
+        }
 
 #if MOVE_PARTICLES
         // MOVE PARTICLES
@@ -1814,6 +1874,13 @@ void Particles::checkFluxSymmetry(Particles *ghostParticles){
                              << " => Fij = " << Fij[ii][3] << ", Fji = " << Fij[iij][3];
                 notSym = true;
             }
+#if DIM == 3
+            if (Fij[iij][4] + Fij[ii][4] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Momentum fluxes (z) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][4] << ", Fji = " << Fij[iij][4];
+                notSym = true;
+            }
+#endif
             if (notSym){
                 Logger(INFO) << "  > Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "], Aji = ["
                              << Aij[iij][0] << ", " << Aij[iij][1] << "]";

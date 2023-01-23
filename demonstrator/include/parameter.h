@@ -11,6 +11,12 @@
 /// define if periodic boundaries should be employed
 #define PERIODIC_BOUNDARIES 0
 
+/// define if timestep is adaptive
+#define ADAPTIVE_TIMESTEP 1
+
+/// define Courant-Friedrichs-Levy number, should be smaller than 1
+#define CFL .4
+
 /// maximum number of interactions for each particle
 #define MAX_NUM_INTERACTIONS 400
 /** maximum interactions with ghost particles
@@ -49,5 +55,8 @@
 
 /// define how much difference is tolerated for I as rotation matrix in 3D for aligned vectors
 //#define ROT_3D_ALIGN_TOL 1e-20
+
+//#define MASS_FLOOR 1e-2
+//#define ENERGY_FLOOR 1.
 
 #endif //DEMONSTRATOR_PARAMETER_H

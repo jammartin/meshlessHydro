@@ -36,8 +36,9 @@ public:
      *             indexed lambda_ij = Lambda[j+DIM*i], DIM=2
      */
     static void rotationMatrix2D(double *a, double *b, double *Lambda);
-
+#if DIM==3
     static void rotationMatrix3D(double *a, double *b, double *Lambda);
+#endif
 
 private:
     double WORK[DIM*DIM];

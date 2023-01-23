@@ -72,6 +72,13 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      SANITY CHECK > pz_tot = " << particles->sumMomentumZ();
 #endif
 
+#if ADAPTIVE_TIMESTEP
+        Logger(INFO) << "    > Selecting global timestep ... ";
+        timeStep = particles->compGlobalTimestep(config.gamma, config.kernelSize);
+        Logger(INFO) << "    > dt = " << timeStep << " selected.";
+#else
+        timeStep = config.timeStep;
+#endif
 
         Logger(INFO) << "    > Computing gradients";
 #if PERIODIC_BOUNDARIES
@@ -119,11 +126,11 @@ void MeshlessScheme::run(){
         particles->compEffectiveFace(ghostParticles);
 #endif
         Logger(DEBUG) << "      > Computing fluxes";
-        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma);
+        particles->compRiemannStatesLR(timeStep, config.kernelSize, config.gamma);
 
 #if PERIODIC_BOUNDARIES
         Logger(DEBUG) << "      > Computing ghost fluxes";
-        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma,
+        particles->compRiemannStatesLR(timeStep, config.kernelSize, config.gamma,
                                      ghostParticles);
         //Logger(DEBUG) << "Aborting for debugging.";
         //exit(6);
@@ -152,7 +159,7 @@ void MeshlessScheme::run(){
 
 
         Logger(INFO) << "    > Solving Riemann problems";
-#if PERIDOIC_BOUNDARIES
+#if PERIODIC_BOUNDARIES
         particles->solveRiemannProblems(config.gamma, ghostParticles);
 #else
         Particles ghostParticles { 0, true }; // DUMMY
@@ -172,12 +179,12 @@ void MeshlessScheme::run(){
         particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary
 
         Logger(INFO) << "    > Updating state";
-        particles->updateStateAndPosition(config.timeStep, domain);
+        particles->updateStateAndPosition(timeStep, domain);
 
         //Logger(INFO) << "    > Moving particles";
         //particles->move(config.timeStep, domain);
 
-        t += config.timeStep;
+        t += timeStep;
         ++step;
         //Logger(DEBUG) << "    > t = " << t << ", step =  " << step
         //          << ", t_end = " << config.timeEnd;
@@ -193,7 +200,7 @@ void MeshlessScheme::run(){
         //particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
         // END DEBUGGING
 
-    } while(t<config.timeEnd+config.timeStep);
+    } while(t<config.timeEnd+timeStep);
 }
 
 MeshlessScheme::~MeshlessScheme(){}

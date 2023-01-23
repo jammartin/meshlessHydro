@@ -43,6 +43,7 @@ public:
     void compPressure(const double &gamma);
     void compEffectiveFace();
 
+    double compGlobalTimestep(const double &gamma, const double &kernelSize);
     void compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma);
 
     void solveRiemannProblems(const double &gamma, const Particles &ghostParticles);
