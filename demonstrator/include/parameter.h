@@ -6,7 +6,7 @@
 #define DEMONSTRATOR_PARAMETER_H
 
 /// possible values 2 or 3 for 2D or 3D simulations
-#define DIM 3
+#define DIM 2
 
 /// define if periodic boundaries should be employed
 #define PERIODIC_BOUNDARIES 0

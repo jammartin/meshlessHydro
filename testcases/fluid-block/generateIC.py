@@ -11,6 +11,7 @@ if __name__=="__main__":
 
     parser = argparse.ArgumentParser(description="Create an initial condition HDF5 file for a 3D fluid-block  test case.")
     parser.add_argument("--numParticles", "-N", metavar="int", type=int, help="number of particles", required=True)
+    parser.add_argument("--twoDimensional", "-t", action="store_true", help="sample 2D 'block'")
     
     args = parser.parse_args()
 
@@ -19,20 +20,28 @@ if __name__=="__main__":
     outH5 = h5.File("fbN{}.h5".format(N), "w")
     print("Generating fluid block initial conditions with", N, "particles ...")
 
+    if args.twoDimensional:
+        DIM = 2
+    
     pos = np.empty((N, DIM))
     xv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
     yv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
-    zv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
+    if not args.twoDimensional:
+        zv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
     i = 0
     for x in xv:
         for y in yv:
-            for z in zv:
-                pos[i,0] = x
-                pos[i,1] = y
-                pos[i,2] = z
-                #print("Particle i =", i, "[", x, ",", y, "]")
-                i += 1
-                
+            if not args.twoDimensional:
+                for z in zv:
+                    pos[i,0] = x
+                    pos[i,1] = y
+                    pos[i,2] = z
+                    #print("Particle i =", i, "[", x, ",", y, , ",", z, "]")
+                    i += 1
+            else:
+                pos[i, 0] = x
+                pos[i, 1] = y
+                                    
     # set velocities
     vel = np.zeros(pos.shape)
     # set densities
@@ -42,7 +51,7 @@ if __name__=="__main__":
     # volume is 1
     m = rho/N
     # create specific internal energy
-    u = np.ones(rho.shape)*10000
+    u = np.ones(rho.shape)
     
     outH5.create_dataset("x", data=pos) 
     outH5.create_dataset("v", data=vel)

@@ -30,6 +30,7 @@ void MeshlessScheme::run(){
         particles->getDomainLimits(domainLimits);
         Domain::Cell boundingBox { domainLimits };
         domain.bounds = boundingBox;
+        domain.printout();
         Logger(DEBUG) << "      > ... creating grid ...";
         domain.createGrid(config.kernelSize);
         Logger(INFO) << "    > ... done.";
@@ -146,7 +147,7 @@ void MeshlessScheme::run(){
 #if DEBUG_LVL > 1
 #if PERIODIC_BOUNDARIES
             Logger(INFO) << "      > Dump ghosts to file";
-            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"), t);
             Logger(INFO) << "      > Dump NNL to file";
             particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif

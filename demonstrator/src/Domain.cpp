@@ -117,6 +117,14 @@ void Domain::getNeighborCells(const int &iCell, int *neighborCell){
     }
 }
 
+void Domain::printout(){
+    Logger(INFO) << "Domain > [[" << bounds.minX << ", " << bounds.maxX << "]";
+    Logger(INFO) << "          [" << bounds.minY << ", " << bounds.maxY << "]";
+#if DIM == 3
+    Logger(INFO) << "          [" << bounds.minZ << ", " << bounds.maxZ << "]";
+#endif
+}
+
 Domain::~Domain(){
     delete[] dimIndex;
 }

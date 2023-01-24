@@ -54,6 +54,7 @@ public:
 
     void createGrid(const double &kernelSize);
     void getNeighborCells(const int &iCell, int *neighborCells);
+    void printout();
 
     Cell bounds; // global cell
     // number of grid cells in each dimension

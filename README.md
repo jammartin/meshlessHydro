@@ -114,6 +114,15 @@ The plot can be generated in `snippets/volumePartition`.
 
 A 2D test case setup as described in [McNally et. al. (2012)](https://arxiv.org/abs/1111.1764). 
 
+The folder `testcases/kelvin-helmholtz` contains all neccessary scripts and files to run a simulation of a Kelvin-Helmholtz test problem with periodic boundary conditions. The following steps need to be followed to achieve this:
+
+1. Generate an initial conditions file with the script `genrateIC.py`. Using the `-g` is strongly recommended. To create an initial condition file with 10000 particles you can run: `./generateIC.py -N 10000 -g`
+2. Copy the file `parameter.h` into the folder `demonstrator/include`replacing the existing file
+3. Copy the file `config.info` into the folder `demonstrator/` replacing the existing file
+4. Build the code by executing `make` in the folder `demonstrator`
+5. Run the program `demonstrator/bin/mlh`
+6. The results can be visualized with the script `densityPlotter.py` e.g: `./densityPlotter.py -o ../../demonstrator/output`
+
 <!--
 
 ### Sedov blast wave

@@ -30,7 +30,7 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
     
     # Plot gradient
     if plotGrad and not plotVel:
-        plotGradient(data["rhoGrad"][:], pos, ax);
+        plotGradient(data["rhoGrad"][:], pos, ax)
     elif not plotGrad and plotVel:
         plotVelocity(data["v"][:], pos, ax)
     elif plotGrad and plotVel:

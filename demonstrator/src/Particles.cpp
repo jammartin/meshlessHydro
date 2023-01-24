@@ -78,6 +78,12 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
         parent = new int[numParticles]; // store index of original node
 #endif
     }
+#if DEBUG_LVL > 1
+    if (ghosts){
+        // This is necessary for dumping ghosts to file
+        noi = new int[numParticles];
+    }
+#endif
 }
 
 Particles::~Particles() {
@@ -128,6 +134,12 @@ Particles::~Particles() {
         delete[] parent;
 #endif
     }
+#if DEBUG_LVL > 1
+    if (ghosts){
+        // This is necessary for dumping ghosts to file
+        delete[] noi;
+    }
+#endif
 }
 
 #if !PERIODIC_BOUNDARIES
