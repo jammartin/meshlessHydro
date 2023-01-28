@@ -28,9 +28,9 @@ def cubicSpline(dx_vec, sml):
 
 if __name__ == '__main__':
 
-    N = 10  # num particles = N**3
+    N = 31 # num particles = N**3
 
-    sml = .08
+    sml = .025
     #sml = 0.041833  # for n = 61**3  = 226981  = ca. 2e5
     # sml = 0.031375  # for n = 81**3  = 531441  = ca. 5e5
     # sml = 0.0251    # for n = 101**3 = 1030301 = ca. 1e6

@@ -118,10 +118,10 @@ void Domain::getNeighborCells(const int &iCell, int *neighborCell){
 }
 
 void Domain::printout(){
-    Logger(INFO) << "Domain > [[" << bounds.minX << ", " << bounds.maxX << "]";
-    Logger(INFO) << "          [" << bounds.minY << ", " << bounds.maxY << "]";
+    Logger(INFO) << "Domain > X [" << bounds.minX << ", " << bounds.maxX << "]";
+    Logger(INFO) << "         Y [" << bounds.minY << ", " << bounds.maxY << "]";
 #if DIM == 3
-    Logger(INFO) << "          [" << bounds.minZ << ", " << bounds.maxZ << "]";
+    Logger(INFO) << "         Z [" << bounds.minZ << ", " << bounds.maxZ << "]";
 #endif
 }
 

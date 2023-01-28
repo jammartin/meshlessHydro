@@ -2,7 +2,8 @@
 SHELL := /bin/bash
 
 # Set compiler
-CXX := mpic++
+#CXX := mpic++
+CXX := g++
 
 TRGTDIR := bin
 TARGET := mlh

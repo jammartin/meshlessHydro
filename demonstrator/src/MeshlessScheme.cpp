@@ -76,7 +76,7 @@ void MeshlessScheme::run(){
 #if ADAPTIVE_TIMESTEP
         Logger(INFO) << "    > Selecting global timestep ... ";
         timeStep = particles->compGlobalTimestep(config.gamma, config.kernelSize);
-        Logger(INFO) << "    > dt = " << timeStep << " selected.";
+        Logger(INFO) << "Time  > dt = " << timeStep << " selected.";
 #else
         timeStep = config.timeStep;
 #endif

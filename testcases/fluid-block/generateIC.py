@@ -24,10 +24,12 @@ if __name__=="__main__":
         DIM = 2
     
     pos = np.empty((N, DIM))
-    xv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
-    yv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
+    xv = np.linspace(-.5, .5, round(N**(1./DIM)), endpoint=False)
+    yv = np.linspace(-.5, .5, round(N**(1./DIM)), endpoint=False)
+
     if not args.twoDimensional:
-        zv = np.linspace(-.5, .5, round(N**(1./3.)), endpoint=False)
+        zv = np.linspace(-.5, .5, round(N**(1./DIM)), endpoint=False)
+    
     i = 0
     for x in xv:
         for y in yv:
@@ -41,6 +43,7 @@ if __name__=="__main__":
             else:
                 pos[i, 0] = x
                 pos[i, 1] = y
+                i += 1
                                     
     # set velocities
     vel = np.zeros(pos.shape)

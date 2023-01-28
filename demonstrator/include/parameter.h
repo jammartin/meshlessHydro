@@ -6,7 +6,7 @@
 #define DEMONSTRATOR_PARAMETER_H
 
 /// possible values 2 or 3 for 2D or 3D simulations
-#define DIM 2
+#define DIM 3
 
 /// define if periodic boundaries should be employed
 #define PERIODIC_BOUNDARIES 0
@@ -15,7 +15,7 @@
 #define ADAPTIVE_TIMESTEP 1
 
 /// define Courant-Friedrichs-Levy number, should be smaller than 1
-#define CFL .4
+#define CFL .25              // TODO: move to config
 
 /// maximum number of interactions for each particle
 #define MAX_NUM_INTERACTIONS 400
@@ -28,7 +28,12 @@
 #define SLOPE_LIMITING 1
 
 /// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
-#define BETA 4.
+#define BETA 1.             // TODO: move to config
+
+/// use pairwise limiter
+#define PAIRWISE_LIMITER 1
+#define PSI_1 .5            // TODO: move to config
+#define PSI_2 .25           // TODO: move to config
 
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
@@ -53,10 +58,7 @@
 /// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
 #define FLUX_SYM_TOL 1e-20
 
-/// define how much difference is tolerated for I as rotation matrix in 3D for aligned vectors
-//#define ROT_3D_ALIGN_TOL 1e-20
-
-//#define MASS_FLOOR 1e-2
-//#define ENERGY_FLOOR 1.
+/// using pressure floor to avoid predicting negative pressures
+//#define PRESSURE_FLOOR 1e-8
 
 #endif //DEMONSTRATOR_PARAMETER_H

@@ -274,6 +274,9 @@ void Particles::gridNNS(Domain &domain, const double &kernelSize){
                 }
             }
         }
+        if (noiBuf == 0){
+            Logger(WARN) << "No neighbors for particle " << i << ". Caution.";
+        }
         noi[i] = noiBuf;
     }
 }
@@ -683,6 +686,14 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             WijL[iW][4] = vz[j] - vFrame[iW][2];
 #endif
 
+#if PAIRWISE_LIMITER
+            double WijR_buf[DIM+2], WijL_buf[DIM+2];
+            for(int nu=0; nu<DIM+2; ++nu){
+                WijR_buf[nu] = WijR[iW][nu];
+                WijL_buf[nu] = WijL[iW][nu];
+            }
+#endif
+
             //if (i == 46){// && jn == 28){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
@@ -717,6 +728,40 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             WijL[iW][4] += Helper::dotProduct(vzGrad[j], xijxj);
 #endif
 
+#if PAIRWISE_LIMITER
+            double xijxi_abs = 0., xijxj_abs = 0., xjxi_abs = 0.;
+            for(int alpha=0; alpha<DIM; ++alpha){
+                xijxi_abs += xijxi[alpha]*xijxi[alpha];
+                xijxj_abs += xijxj[alpha]*xijxj[alpha];
+                xjxi_abs += xjxi[alpha]*xjxi[alpha];
+            }
+            xijxi_abs = sqrt(xijxi_abs);
+            xijxj_abs = sqrt(xijxj_abs);
+            xjxi_abs = sqrt(xjxi_abs);
+
+            for(int nu=0; nu<DIM+2; ++nu){
+                WijR[iW][nu] = pairwiseLimiter(WijR[iW][nu], WijR_buf[nu], WijL_buf[nu], xijxi_abs, xjxi_abs);
+                WijL[iW][nu] = pairwiseLimiter(WijL[iW][nu], WijL_buf[nu], WijR_buf[nu], xijxj_abs, xjxi_abs);
+            }
+#endif
+
+#if DEBUG_LVL
+            if(WijR[iW][1] < 0. || WijL[iW][1] < 0.) {
+                Logger(WARN) << "FACE RECONSTRUCTION > Negative pressure encountered@(i = " << i << ", j = " << j << ")";
+                Logger(DEBUG) << "rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
+                              << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
+                              << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1]
+                              << ", PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
+#if DIM == 3
+                              << ", " << PGrad[i][2]
+#endif
+                              << "] , PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
+#if DIM == 3
+                              << ", " << PGrad[j][2]
+#endif
+                              << "]";
+            }
+#endif
             //if (i == 46){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
@@ -754,6 +799,28 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             WijR[iW][1] -= dt/2. * (vz[i]-vFrame[iW][2])*PGrad[i][2];
             WijL[iW][1] -= dt/2. * (vz[j]-vFrame[iW][2])*PGrad[j][2];
 
+#if DEBUG_LVL
+            if(WijR[iW][1] < 0. || WijL[iW][1] < 0.) {
+                Logger(WARN) << "TIME PREDICTION > Negative pressure encountered@(i = " << i << ", j = " << j << ")";
+
+                double timePredP_i = dt / 2. * (gamma * P[i] * viDiv + (vx[i] - vFrame[iW][0]) * PGrad[i][0] +
+                                                (vy[i] - vFrame[iW][1]) * PGrad[i][1]
+#if DIM == 3
+                                                + (vz[i] - vFrame[iW][2]) * PGrad[i][2]
+#endif
+                );
+                Logger(DEBUG) << "Pressure timestep prediction term @i: " << timePredP_i;
+
+                double timePredP_j = dt / 2. * (gamma * P[j] * viDiv + (vx[j] - vFrame[iW][0]) * PGrad[j][0] +
+                                                (vy[j] - vFrame[iW][1]) * PGrad[j][1]
+#if DIM == 3
+                                                + (vz[j] - vFrame[iW][2]) * PGrad[j][2]
+#endif
+                );
+                Logger(DEBUG) << "Pressure timestep prediction term @j: " << timePredP_j;
+            }
+#endif
+
             // velocities
             WijR[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[i][2];
             WijL[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[j][2];
@@ -772,6 +839,58 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 
         }
     }
+}
+
+double Particles::pairwiseLimiter(double phi0, double phi_i, double phi_j, double xijxi_abs, double xjxi_abs) {
+    double phi_ = phi_i;
+
+    /// calculate helper values
+    double phi_ij = phi_i + xijxi_abs / xjxi_abs * (phi_j - phi_i);
+    double phiMin, phiMax;
+    if (phi_i < phi_j) {
+        phiMin = phi_i;
+        phiMax = phi_j;
+    } else {
+        phiMin = phi_j;
+        phiMax = phi_i;
+    }
+    double delta1 = PSI_1 * abs(phi_i - phi_j);
+    double delta2 = PSI_2 * abs(phi_i - phi_j);
+    double phiMinus, phiPlus;
+    if ((phiMax + delta1 >= 0. && phiMax >= 0.) || (phiMax + delta1 < 0. && phiMax < 0.)) {
+        phiPlus = phiMax + delta1;
+    } else {
+        phiPlus = phiMax / (1. + delta1 / abs(phiMax));
+    }
+    if ((phiMin - delta1 >= 0. && phiMin >= 0.) || (phiMin - delta1 < 0. && phiMin < 0.)) {
+        phiMinus = phiMin - delta1;
+    } else {
+        phiMinus = phiMin / (1. + delta1 / abs(phiMin));
+    }
+
+    /// actually compute the effective face limited value
+    if (phi_i < phi_j) {
+        double minPhiD2;
+        if (phi_ij + delta2 < phi0){
+            minPhiD2 = phi_ij + delta2;
+        } else {
+            minPhiD2 = phi0;
+        }
+
+        phi_ = phiMinus > minPhiD2 ? phiMinus : minPhiD2;
+
+    } else if (phi_i > phi_j){
+        double maxPhiD2;
+        if (phi_ij - delta2 > phi0){
+            maxPhiD2 = phi_ij - delta2;
+        } else {
+            maxPhiD2 = phi0;
+        }
+
+        phi_ = phiPlus < maxPhiD2 ? phiPlus : maxPhiD2;
+
+    }
+    return phi_;
 }
 
 void Particles::solveRiemannProblems(const double &gamma, const Particles &ghostParticles){
@@ -802,7 +921,7 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 
             if(WijR[ii][1] < 0. || WijL[ii][1] < 0.){
                 Logger(WARN) << "Negative pressure encountered@(i = " << i << ", j = " << j << ") Very bad :( !!";
-                Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
+                Logger(DEBUG) << "    > rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
                               << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
                               << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
                               << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1]
@@ -811,10 +930,16 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 #endif
                               << "]";
 
-#if DEBUG_LVL
+#if DEBUG_LVL > 1
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
 #endif
+                //if(WijR[ii][1] < 0.){
+                //    WijR[ii][1] = PRESSURE_FLOOR;
+                //}
+                //if(WijL[ii][1] < 0.){
+                //    WijL[ii][1] = PRESSURE_FLOOR;
+                //}
             }
 
             bool compute = true;
@@ -1821,7 +1946,11 @@ double Particles::sumMass(){
 double Particles::sumEnergy(){
     double E = 0.;
     for (int i=0; i<N; ++i){
+#if DIM == 2
         E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]));
+#else
+        E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]));
+#endif
     }
     return E;
 }
