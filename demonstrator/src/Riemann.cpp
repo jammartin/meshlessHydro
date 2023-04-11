@@ -168,6 +168,12 @@ void Riemann::rotateAndProjectFluxes2D(double *Fij, const double &gamma){
     vLab[0] = vSol[0] + vFrame[0];
     vLab[1] = vSol[1] + vFrame[1];
 
+#if MESHLESS_FINITE_MASS
+    // this has no direct physical meaning but effectively suppresses all advection terms
+    vSol[0] = 0.;
+    vSol[1] = 0.;
+#endif // MESHLESS_FINITE_MASS
+
     Fij[2] = Aij[0]*(rhoSol*vLab[0]*vSol[0]+PSol) + Aij[1]*rhoSol*vLab[0]*vSol[1]; // vx flux
     Fij[3] = Aij[0]*rhoSol*vLab[1]*vSol[0] + Aij[1]*(rhoSol*vLab[1]*vSol[1]+PSol); // vy flux
 
@@ -204,6 +210,13 @@ void Riemann::rotateAndProjectFluxes3D(double *Fij, const double &gamma){
     vLab[0] = vSol[0] + vFrame[0];
     vLab[1] = vSol[1] + vFrame[1];
     vLab[2] = vSol[2] + vFrame[2];
+
+#if MESHLESS_FINITE_MASS
+    // this has no direct physical meaning but effectively suppresses all advection terms
+    vSol[0] = 0.;
+    vSol[1] = 0.;
+    vSol[2] = 0.;
+#endif // MESHLESS_FINITE_MASS
 
     Fij[2] = Aij[0]*(rhoSol*vLab[0]*vSol[0]+PSol) + Aij[1]*rhoSol*vLab[0]*vSol[1] + Aij[2]*rhoSol*vLab[0]*vSol[2]; // vx flux
     Fij[3] = Aij[0]*rhoSol*vLab[1]*vSol[0] + Aij[1]*(rhoSol*vLab[1]*vSol[1]+PSol) + Aij[2]*rhoSol*vLab[1]*vSol[2]; // vy flux

@@ -49,6 +49,9 @@ void Helper::rotationMatrix3D(double *a, double *b, double *Lambda){
     double v[DIM];
     crossProduct(a, b, v);
     double cosAB = dotProduct(a, b); // a and b MUST be normed
+
+    // TODO: cosAB == -1 fails !!!
+
     double n = 1./(1. + cosAB);
 
     Lambda[0] = 1.-n*(v[2]*v[2]+v[1]*v[1]);

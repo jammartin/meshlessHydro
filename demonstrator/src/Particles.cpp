@@ -422,6 +422,12 @@ void Particles::compEffectiveFace(){
                 Aij[i*MAX_NUM_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xi[i*MAX_NUM_INTERACTIONS+j][alpha]
                         - 1./omega[ji]*psijTilde_xi[ij+ji*MAX_NUM_INTERACTIONS][alpha];
             }
+
+            //if(i < 10){
+            //    Logger(DEBUG) << "A[" << i << " -> " << ji << "] = [" << Aij[i*MAX_NUM_INTERACTIONS+j][0] << ", "
+            //                  << Aij[i*MAX_NUM_INTERACTIONS+j][1] << ", " << Aij[i*MAX_NUM_INTERACTIONS+j][2] << "], xi = ["
+            //                  << x[i] << ", " << y[i] << ", " << z[i] << "], xj = " << x[ji] << ", " << y[ji] << ", " << z[ji] << "]";
+            //}
         }
     }
 }
@@ -1183,10 +1189,11 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 
 #if MOVE_PARTICLES
         // MOVE PARTICLES
-        x[i] += .5*(vx[i]+vxi)*dt;
-        y[i] += .5*(vy[i]+vyi)*dt;
-        //x[i] += vxi*dt;
-        //y[i] += vyi*dt;
+        //x[i] += .5*(vx[i]+vxi)*dt;
+        //y[i] += .5*(vy[i]+vyi)*dt;
+        // stay consistent with choice of effective frame
+        x[i] += vxi*dt;
+        y[i] += vyi*dt;
 #if DIM==3
         z[i] += .5*(vz[i]+vzi)*dt;
 #endif
@@ -2085,6 +2092,12 @@ void Particles::dump2file(std::string filename, double simTime){
     // create datasets
     // TODO: Create a h5 object holding all meta data
     HighFive::DataSet timeDataSet = h5File.createDataSet<double>("/time", HighFive::DataSpace(1));
+    HighFive::DataSet energyDataSet = h5File.createDataSet<double>("/energy", HighFive::DataSpace(1));
+    HighFive::DataSet xMomDataSet = h5File.createDataSet<double>("/xMomentum", HighFive::DataSpace(1));
+    HighFive::DataSet yMomDataSet = h5File.createDataSet<double>("/yMomentum", HighFive::DataSpace(1));
+#if DIM == 3
+    HighFive::DataSet zMomDataSet = h5File.createDataSet<double>("/zMomentum", HighFive::DataSpace(1));
+#endif
     HighFive::DataSet rhoDataSet = h5File.createDataSet<double>("/rho", HighFive::DataSpace(N));
     HighFive::DataSet mDataSet = h5File.createDataSet<double>("/m", HighFive::DataSpace(N));
     HighFive::DataSet uDataSet = h5File.createDataSet<double>("/u", HighFive::DataSpace(N));
@@ -2097,6 +2110,12 @@ void Particles::dump2file(std::string filename, double simTime){
 
     // containers for particle data
     std::vector<double> timeVec({ simTime });
+    std::vector<double> energyVec({ sumEnergy() });
+    std::vector<double> xMomVec({ sumMomentumX() });
+    std::vector<double> yMomVec({ sumMomentumY() });
+#if DIM ==3
+    std::vector<double> zMomVec({ sumMomentumZ() });
+#endif
     std::vector<double> rhoVec(rho, rho+N);
     std::vector<double> mVec(m, m+N);
     std::vector<double> uVec(u, u+N);
@@ -2140,6 +2159,12 @@ void Particles::dump2file(std::string filename, double simTime){
     }
     // write data
     timeDataSet.write(timeVec); // dummy vec containing one element
+    energyDataSet.write(energyVec);
+    xMomDataSet.write(xMomVec);
+    yMomDataSet.write(yMomVec);
+#if DIM == 3
+    zMomDataSet.write(zMomVec);
+#endif
     rhoDataSet.write(rhoVec);
     mDataSet.write(mVec);
     uDataSet.write(uVec);
