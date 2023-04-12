@@ -661,7 +661,13 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #endif
 
             int iW = i*MAX_NUM_INTERACTIONS+jn;
-
+#if !MOVE_PARTICLES
+            vFrame[iW][0] = 0.;
+            vFrame[iW][1] = 0.;
+#if DIM==3
+            vFrame[iW][2] = 0.;
+#endif
+#else // MOVE_PARTICLES
 #if FIRST_ORDER_QUAD_POINT
             vFrame[iW][0] = (vx[i] + vx[j])/2.;
             vFrame[iW][1] = (vy[i] + vy[j])/2.;
@@ -678,6 +684,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             vFrame[iW][2] = vz[i] + (vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 #endif
+#endif // MOVE_PARTICLES
             // boost frame to effective face
             WijR[iW][0] = rho[i];
             WijL[iW][0] = rho[j];
@@ -1216,7 +1223,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         }
 #endif
 #endif
-#endif
+#endif // MOVE_PARTICLES
     }
 }
 
@@ -1690,7 +1697,13 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #endif
 
             int iW = i*MAX_NUM_GHOST_INTERACTIONS+jn;
-
+#if !MOVE_PARTICLES
+            vFrameGhosts[iW][0] = 0.;
+            vFrameGhosts[iW][1] = 0.;
+#if DIM==3
+            vFrameGhosts[iW][2] = 0.;
+#endif
+#else // !MOVE_PARTICLES
 #if FIRST_ORDER_QUAD_POINT
             vFrameGhosts[iW][0] = (vx[i] + ghostParticles.vx[j])/2.;
             vFrameGhosts[iW][1] = (vy[i] + ghostParticles.vy[j])/2.;
@@ -1707,6 +1720,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             vFrameGhosts[iW][2] = vz[i] + (ghostParticles.vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 #endif
+#endif // !MOVE_PARTICLES
             /*if(i == 394){
                 Logger(DEBUG) << "vFrame[0] = " << vFrameGhosts[iW][0]
                               << ", vFrame[1] = " << vFrameGhosts[iW][1]
@@ -2092,6 +2106,7 @@ void Particles::dump2file(std::string filename, double simTime){
     // create datasets
     // TODO: Create a h5 object holding all meta data
     HighFive::DataSet timeDataSet = h5File.createDataSet<double>("/time", HighFive::DataSpace(1));
+    HighFive::DataSet totalMassDataSet = h5File.createDataSet<double>("/totalMass", HighFive::DataSpace(1));
     HighFive::DataSet energyDataSet = h5File.createDataSet<double>("/energy", HighFive::DataSpace(1));
     HighFive::DataSet xMomDataSet = h5File.createDataSet<double>("/xMomentum", HighFive::DataSpace(1));
     HighFive::DataSet yMomDataSet = h5File.createDataSet<double>("/yMomentum", HighFive::DataSpace(1));
@@ -2110,6 +2125,7 @@ void Particles::dump2file(std::string filename, double simTime){
 
     // containers for particle data
     std::vector<double> timeVec({ simTime });
+    std::vector<double> totalMassVec({ sumMass() });
     std::vector<double> energyVec({ sumEnergy() });
     std::vector<double> xMomVec({ sumMomentumX() });
     std::vector<double> yMomVec({ sumMomentumY() });
@@ -2159,6 +2175,7 @@ void Particles::dump2file(std::string filename, double simTime){
     }
     // write data
     timeDataSet.write(timeVec); // dummy vec containing one element
+    totalMassDataSet.write(totalMassVec);
     energyDataSet.write(energyVec);
     xMomDataSet.write(xMomVec);
     yMomDataSet.write(yMomVec);

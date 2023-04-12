@@ -13,7 +13,7 @@ def createPlot(h5File, outDir, plotGrad, plotVel, iNNL):
     data = h5.File(h5File, 'r')
     pos = data["x"][:]
 
-    time = data["time"][()][0]
+    time = data["time"][0]
     
     rho = data["rho"][()]
     #P = data["P"][()]
