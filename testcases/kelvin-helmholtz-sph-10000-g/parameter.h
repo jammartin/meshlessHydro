@@ -21,12 +21,6 @@
 /// define if periodic boundaries should be employed
 #define PERIODIC_BOUNDARIES 1
 
-/// define if timestep is adaptive
-#define ADAPTIVE_TIMESTEP 1
-
-/// define Courant-Friedrichs-Levy number, should be smaller than 1
-#define CFL .2              // TODO: move to config
-
 /// maximum number of interactions for each particle
 #define MAX_NUM_INTERACTIONS 8000
 /** maximum interactions with ghost particles
@@ -38,20 +32,12 @@
 #define SLOPE_LIMITING 0
 
 /// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
-#define BETA 4.             // TODO: move to config
-
-/// use pairwise limiter
-#define PAIRWISE_LIMITER 1
-#define PSI_1 .5            // TODO: move to config
-#define PSI_2 .25           // TODO: move to config
-
-/// meshless finite mass method instead of meshless finite volume
-#define MESHLESS_FINITE_MASS 0
+#define BETA 4.
 
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
 
-/// define if particles should move, otherwise a fixed grid is used
+/// define is particles should move, otherwise a fixed grid is used
 #define MOVE_PARTICLES 1
 
 /** define debug level to enable additional output:
@@ -68,12 +54,7 @@
 // TODO: use this flag when debug level 1
 #define VERBOSITY_PARTICLES 10
 
-
-/// deprecated, ENFORCE_FLUX_SYM should be set to 1
-// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
+/// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
 #define FLUX_SYM_TOL 1e-20
-
-// using pressure floor to avoid predicting negative pressures
-//#define PRESSURE_FLOOR 1e-8
 
 #endif //DEMONSTRATOR_PARAMETER_H

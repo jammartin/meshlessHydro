@@ -13,7 +13,7 @@ timeStep .005
 timeEnd 4.
 
 ; output particle distribution each h5DumpInterval steps
-h5DumpInterval 10
+h5DumpInterval 5
 
 ; periodic boundaries of box
 ; ignored when PERIODIC_BOUNDARIES is not set in parameter.h

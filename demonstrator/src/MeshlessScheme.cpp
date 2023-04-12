@@ -77,6 +77,7 @@ void MeshlessScheme::run(){
 
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
+        //particles->printDensity(config.gamma);
 
         Logger(DEBUG) << "      SANITY CHECK > V_tot = " << particles->sumVolume();
         Logger(DEBUG) << "      SANITY CHECK > M_tot = " << particles->sumMass();
@@ -216,8 +217,9 @@ void MeshlessScheme::run(){
 #endif
 
         Logger(INFO) << "    > Collecting fluxes";
-        particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary
-
+//#if PERIODIC_BOUNDARIES
+        //particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary
+//#endif
         Logger(INFO) << "    > Updating state";
         particles->updateStateAndPosition(timeStep, domain);
 
