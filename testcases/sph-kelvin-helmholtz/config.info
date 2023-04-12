@@ -1,0 +1,42 @@
+; h5 file containing the initial particle distribution
+;initFile ../testcases/kelvin-helmholtz-sph/khN900.h5
+;initFile ../testcases/kelvin-helmholtz/khN900.h5
+initFile ../testcases/kelvin-helmholtz-sph-10000-g/khN10000.h5
+;initFile ../testcases/kelvin-helmholtz-sph-40000/khN40000.h5
+;initFile ../testcases/kelvin-helmholtz-sph-40000-g/khN40000.h5
+;initFile ../testcases/kelvin-helmholtz-sph-10000-g-long/khN10000.h5
+
+; output directory for particle distribution h5 files
+;outDir ../testcases/kelvin-helmholtz-sph/output
+;outDir ../testcases/kelvin-helmholtz/output
+outDir ../testcases/kelvin-helmholtz-sph-10000-g/output
+;outDir ../testcases/kelvin-helmholtz-sph-40000/output
+;outDir ../testcases/kelvin-helmholtz-sph-40000-g/output
+;outDir ../testcases/kelvin-helmholtz-sph-10000-g-long/output
+
+; fixed time step
+timeStep .005
+
+; end of the simulation
+timeEnd 2
+
+; output particle distribution each h5DumpInterval steps
+h5DumpInterval 5
+
+; periodic boundaries of box
+; ignored when PERIODIC_BOUNDARIES is not set in parameter.h
+periodicBoxLimits {
+    lowerX -.5
+    lowerY -.5
+    lowerZ 0.
+    upperX .5
+    upperY .5
+    upperZ 0.
+}
+
+// TODO: this is implemented as half the kernel size
+; kernel size for meshless scheme
+kernelSize .09
+
+; adiabatic index
+gamma 1.6666666666666667

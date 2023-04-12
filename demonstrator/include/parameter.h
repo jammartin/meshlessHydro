@@ -5,16 +5,6 @@
 #ifndef DEMONSTRATOR_PARAMETER_H
 #define DEMONSTRATOR_PARAMETER_H
 
-/// define if code should run as SPH.
-#define RUNSPH 1
-
-// define if arificial viscosity should be employed
-#define ARTVISC 1
-
-#define ALPHA_VISC 1
-#define BETA_VISC 2
-#define EPSMU .01
-
 /// possible values 2 or 3 for 2D or 3D simulations
 #define DIM 2
 
@@ -28,14 +18,14 @@
 #define CFL .2              // TODO: move to config
 
 /// maximum number of interactions for each particle
-#define MAX_NUM_INTERACTIONS 8000
+#define MAX_NUM_INTERACTIONS 200
 /** maximum interactions with ghost particles
  *  ignored when `PERIODIC_BOUNDARIES` is not set
 **/
-#define MAX_NUM_GHOST_INTERACTIONS 7000
+#define MAX_NUM_GHOST_INTERACTIONS 150
 
 /// flag for slope limiting, 0: no slope limiting
-#define SLOPE_LIMITING 0
+#define SLOPE_LIMITING 1
 
 /// slope limiting parameter, ignored when `SLOPE_LIMITING` is false
 #define BETA 4.             // TODO: move to config
@@ -46,7 +36,7 @@
 #define PSI_2 .25           // TODO: move to config
 
 /// meshless finite mass method instead of meshless finite volume
-#define MESHLESS_FINITE_MASS 0
+#define MESHLESS_FINITE_MASS 1
 
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
@@ -63,6 +53,17 @@
 
 /// use first order quadrature point for Riemann problems
 #define FIRST_ORDER_QUAD_POINT 1
+
+/// define if code should run as SPH, which ignores most of the directives above
+#define RUNSPH 0
+
+/// define if arificial viscosity should be employed
+#define ARTVISC 1
+
+/// artificial viscosity parameters
+#define ALPHA_VISC 1
+#define BETA_VISC 2
+#define EPSMU .01
 
 /// define verbosity for each VERBOSITY_PARTICLES particles
 // TODO: use this flag when debug level 1

@@ -77,52 +77,50 @@ void SPH::run(){
         particles->updateGhostState(ghostParticles);
 #endif
 
-#if SLOPE_LIMITING
-        // TODO: Check slope limiter
-        Logger(DEBUG) << "      > Limiting slopes";
-        particles->slopeLimiter(config.kernelSize, &ghostParticles);
-        Logger(DEBUG) << "      > Update limited ghost gradients";
-        particles->updateGhostGradients(ghostParticles);
-#endif
+//#if SLOPE_LIMITING
+//        // TODO: Check slope limiter
+//        Logger(DEBUG) << "      > Limiting slopes";
+//        particles->slopeLimiter(config.kernelSize, &ghostParticles);
+//        Logger(DEBUG) << "      > Update limited ghost gradients";
+//        particles->updateGhostGradients(ghostParticles);
+//#endif
 
 
 #if ARTVISC
-Logger(INFO) << "   > Computing speed of sound";
-particles->compCs(config.gamma);
-        // Logger(INFO) << "   > Computing artificial viscocity for acceleration";
-        // particles->compAccArtVisc(config.kernelSize);
-// #if PERIODIC_BOUNDARIES
-//         particles->compAccArtVisc(ghostParticles, config.kernelSize);
-// #endif
+    Logger(INFO) << "   > Computing speed of sound";
+    particles->compCs(config.gamma);
+            // Logger(INFO) << "   > Computing artificial viscocity for acceleration";
+            // particles->compAccArtVisc(config.kernelSize);
+    // #if PERIODIC_BOUNDARIES
+    //         particles->compAccArtVisc(ghostParticles, config.kernelSize);
+    // #endif
 #endif
 
 #if PERIODIC_BOUNDARIES
-Logger(DEBUG) << "	> Computing acceleration";
-particles->compAccSPH(ghostParticles, config.kernelSize);
+    Logger(DEBUG) << "	> Computing acceleration";
+    particles->compAccSPH(ghostParticles, config.kernelSize);
 #else
-Logger(DEBUG) << "	> Computing acceleration";
-particles->compAccSPH(config.kernelSize);
+    Logger(DEBUG) << "	> Computing acceleration";
+    particles->compAccSPH(config.kernelSize);
 #endif
 
 #if PERIODIC_BOUNDARIES
         particles->updateGhostState(ghostParticles);
 #endif
 
-#if SLOPE_LIMITING
-        // TODO: check how to properly limit gradiens
-        Logger(DEBUG) << "      > Limiting slopes";
-        particles->slopeLimiter(config.kernelSize);
-#endif
+//#if SLOPE_LIMITING
+//        // TODO: check how to properly limit gradiens
+//        Logger(DEBUG) << "      > Limiting slopes";
+//        particles->slopeLimiter(config.kernelSize);
+//#endif
 
         Logger(INFO) << "    > Euler integration";
 
-        Logger(DEBUG) << "Old Energy:";
-        particles->sumEnergy();
+        Logger(DEBUG) << "      > Old Energy:" << particles->sumEnergy();
 
         particles->eulerSPH(config.timeStep, domain);
 
-        Logger(DEBUG) << "New Energy";
-        particles->sumEnergy();
+        Logger(DEBUG) << "      > New Energy; " << particles->sumEnergy();
 
          // ENERGY
          Logger(DEBUG) << " 	> Computing omega w/o ghost particcles:";
@@ -156,9 +154,9 @@ particles->compAccSPH(config.kernelSize);
 #endif
 #endif
 
-        Logger(DEBUG) << "Updating u[i]. Printing energy before and after";
+        //Logger(DEBUG) << "Updating u[i]. Printing energy before and after";
         particles->compuis(config.timeStep, config.kernelSize);
-        particles->sumEnergy();
+        //particles->sumEnergy();
 
 // // #if PERIODIC_BOUNDARIES
 // //         particles->updateGhostState(ghostParticles);
@@ -218,7 +216,7 @@ particles->compAccSPH(config.kernelSize);
         //particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
         // END DEBUGGING
     } while(t<config.timeEnd+config.timeStep);
-#endif
+#endif // RUNSPH
 }
 
 SPH::~SPH(){}

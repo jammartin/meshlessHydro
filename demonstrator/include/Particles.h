@@ -53,7 +53,6 @@ public:
     double *ax, *ay;
     double *z, *vz;
     double *az;
-
     // For SPH:
     // For comparable ICs: This sets the internal energies so that P = 2.5 everywhere
     void setInternalEnergy(const double Pressure, const double gamma);
@@ -131,7 +130,7 @@ public:
     void compUiArtVisc(const Particles &ghostParticles, const double &kernelSize);
 #endif
 #endif
-#endif
+#endif // RUNSPH
 
     void compDensity(const double &kernelSize); // also computes omega
 

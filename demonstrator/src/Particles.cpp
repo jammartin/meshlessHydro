@@ -101,7 +101,7 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
 	dEdt = new double[numParticles];
 	dn = new double[numParticles];
 	drho = new double[numParticles];
-#endif
+#endif // RUNSPH
 
     //TODO: check if this is needed as array
     //B = new double[numParticles][DIM*DIM];
@@ -183,7 +183,7 @@ Particles::~Particles() {
     delete[] az;
     delete[] azArtVisc;
 #endif
-#endif
+#endif // RUNSPH
 
     if (!ghosts) {
         delete[] psijTilde_xi;
@@ -265,7 +265,7 @@ void Particles::getDomainLimits(double *domainLimits){
     domainLimits[DIM+2] = maxZ;
 #endif
 }
-#endif
+#endif // !PERIODIC_BOUNDARIES
 
 void Particles::assignParticlesAndCells(Domain &domain){
 
@@ -517,8 +517,8 @@ void Particles::compuis(const double &dt, const double &kernelSize){
         u[i] += dudtArtVisc[i] * dt;
 #endif
         //std::cout << "u_" << i << ": " << u[i] << ", was " << u_i_old << std::endl;;
-        if (u[i] < 0){
-            Logger(DEBUG) << "+++DANGER+++";
+        if (u[i] < 0.){
+            Logger(WARN) << "+++DANGER+++ negative specific internal energy encountered.";
         }
     }
 }
@@ -662,7 +662,7 @@ void Particles::compAccSPH(const Particles &ghostParticles, const double &kernel
             r = sqrt(dSqr);
             PRhoTarget =  P[iP] / pow(rho[iP], 2);
 #if ARTVISC
-            PIij = compPIij(i, iP, 1.5, 3, kernelSize);
+            PIij = compPIij(i, iP, 1.5, 3, kernelSize); // TODO: what is 1.5 and 3. ???
             ax[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
             ay[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
 
@@ -1161,9 +1161,9 @@ void Particles::compDensity(const double &kernelSize){
         if(rho[i] <= 0.){
             Logger(WARN) << "Zero or negative density @" << i;
         }
-        if ((i - 0) % 30 == 0){
-            Logger(DEBUG) << "density from ghosts: i = " << i << ", dnst = " << rho[i];
-        }
+        //if ((i - 0) % 30 == 0){
+        //    Logger(DEBUG) << "density from ghosts: i = " << i << ", dnst = " << rho[i];
+        //}
     }
 }
 
@@ -1234,8 +1234,8 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
 
         for (int j=0; j<noi[i]; ++j) {
             iP = nnl[j+i*MAX_NUM_INTERACTIONS];
-            double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
-                          + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
+            double dSqr = pow(x[i] - x[iP], 2)
+                          + pow(y[i] - y[iP], 2);
 #if DIM == 3
             dSqr += pow(z[i] - z[iP], 2);
 #endif
@@ -1566,7 +1566,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #if DIM==3
             vFrame[iW][2] = vz[i] + (vz[j]-vz[i]) * dotProd/dSqr;
 #endif
-#endif
+#endif // FIRST_ORDER_QUAD_POINT
 #endif // MOVE_PARTICLES
             // boost frame to effective face
             WijR[iW][0] = rho[i];
@@ -2086,7 +2086,8 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         y[i] += vyi*dt;
 
 #if DIM==3
-        z[i] += .5*(vz[i]+vzi)*dt;
+        //z[i] += .5*(vz[i]+vzi)*dt;
+        z[i] += vzi*dt;
 #endif
 #if PERIODIC_BOUNDARIES
         if (x[i] < domain.bounds.minX) {
@@ -2106,7 +2107,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
             z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
         }
 #endif
-#endif
+#endif // PERIODIC_BOUNDARIES
 #endif // MOVE_PARTICLES
     }
 }
@@ -2260,7 +2261,6 @@ void Particles::ghostNNS(Domain &domain, const Particles &ghostParticles, const 
         noiGhosts[i] = noiBuf;
     }
 }
-#endif
 
 void Particles::compDensity(const Particles &ghostParticles, const double &kernelSize){
     for(int i=0; i<N; ++i){
@@ -2402,8 +2402,8 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
 
         for (int j=0; j<noi[i]; ++j) {
             iP = nnl[j+i*MAX_NUM_INTERACTIONS];
-            double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
-                          + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
+            double dSqr = pow(x[i] - x[iP], 2)
+                          + pow(y[i] - y[iP], 2);
 #if DIM == 3
             dSqr += pow(z[i] - z[iP], 2);
 #endif
@@ -2790,44 +2790,44 @@ void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
 
     }
 }
-
+#endif
 
 // TODO: remove below
-/*void Particles::move(const double &dt, Domain &domain){
-
-    for(int i=0; i<N; ++i) {
-
-        //Logger(DEBUG) << "v@" << i <<  " = [" << vx[i] << ", " << vy[i] << "]"
-        //            << ", x[n] = [" << x[i] << ", " << y[i] << "]";
-
-        x[i] = x[i] + vx[i] * dt;
-        y[i] = y[i] + vy[i] * dt;
-#if DIM == 3
-        z[i] = z[i] +vz[i] * dt;
-#endif
-#if PERIODIC_BOUNDARIES
-        if (x[i] < domain.bounds.minX) {
-            x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
-        } else if (domain.bounds.maxX <= x[i]) {
-            x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
-        }
-        if (y[i] < domain.bounds.minY) {
-            y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
-        } else if (domain.bounds.maxY <= y[i]) {
-            y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
-        }
-#if DIM ==3
-        if (z[i] < domain.bounds.minZ) {
-            z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
-        } else if (domain.bounds.maxZ <= z[i]) {
-            z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
-        }
-#endif
-#endif
-        //Logger(DEBUG) << "                               x[n+1] = ["
-        //          << x[i] << ", " << y[i] << "]";
-    }
-}*/
+//void Particles::move(const double &dt, Domain &domain){
+//
+//    for(int i=0; i<N; ++i) {
+//
+//        //Logger(DEBUG) << "v@" << i <<  " = [" << vx[i] << ", " << vy[i] << "]"
+//        //            << ", x[n] = [" << x[i] << ", " << y[i] << "]";
+//
+//        x[i] = x[i] + vx[i] * dt;
+//        y[i] = y[i] + vy[i] * dt;
+//#if DIM == 3
+//        z[i] = z[i] +vz[i] * dt;
+//#endif
+//#if PERIODIC_BOUNDARIES
+//        if (x[i] < domain.bounds.minX) {
+//            x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
+//        } else if (domain.bounds.maxX <= x[i]) {
+//            x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
+//        }
+//        if (y[i] < domain.bounds.minY) {
+//            y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
+//        } else if (domain.bounds.maxY <= y[i]) {
+//            y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
+//        }
+//#if DIM ==3
+//        if (z[i] < domain.bounds.minZ) {
+//            z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
+//        } else if (domain.bounds.maxZ <= z[i]) {
+//            z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
+//        }
+//#endif
+//#endif
+//        //Logger(DEBUG) << "                               x[n+1] = ["
+//        //          << x[i] << ", " << y[i] << "]";
+//    }
+//}
 
 /// Sanity check functions
 double Particles::sumVolume(){
@@ -2858,7 +2858,7 @@ double Particles::sumEnergy(){
         E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]));
 #endif
     }
-    std::cout << "E is " <<  E << std::endl;
+    //std::cout << "E is " <<  E << std::endl;
     return E;
 }
 

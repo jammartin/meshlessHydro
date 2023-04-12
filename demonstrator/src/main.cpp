@@ -104,10 +104,9 @@ int main(int argc, char *argv[]){
 
 #if RUNSPH
     SPH algorithm {config, &particles, boundingBox};
-#else
-
+#else // RUNSPH
     MeshlessScheme algorithm { config, &particles, boundingBox };
-#endif
+#endif // RUNSPH
 
     Logger(INFO) << "... done.";
 
