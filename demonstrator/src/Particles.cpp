@@ -309,18 +309,13 @@ void Particles::assignParticlesAndCells(Domain &domain){
         //
         // Logger(DEBUG) << "floor x = " << floorX
         //          << ", floor y = " << floorY;
-<<<<<<< HEAD
-        //
-        // Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
-        //          << "] to cell " << iGrid;
-=======
 
         //Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
 //#if DIM == 3
 //                      << ", " << z[i]
 //#endif
 //                      << "] to cell " << iGrid;
->>>>>>> main
+
         domain.grid[iGrid].prtcls.push_back(i);
         cell[i] = iGrid; // assign cells to particles
     }
@@ -539,10 +534,12 @@ void Particles::compOmegas(const double &kernelSize){
 // Implementing equations F5 and F6 in Hopkins` GIZMO Paper
 void Particles::calcdndrho(const double &kernelSize){
     double r, dSqr, tmp;
+    int iP;
     for (int i = 0; i < N; i++){
         dn[i] = 0;
         drho[i] = 0;
         for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
             dSqr = pow(x[i] - x[iP], 2)
                         + pow(y[i] - y[iP], 2);
 #if DIM == 3
@@ -558,18 +555,31 @@ void Particles::calcdndrho(const double &kernelSize){
 // Implementing the sum in equation F3 in Hopkins` GIZMO Paper
 void Particles::calcdE(const double &kernelSize){
     double tmp, dSqr, r, fij;
+    int iP;
     for (int i = 0; i < N; i++){
+        dEdt[i] = 0;
         for (int j = 0; j < noi[i]; j++){
-            tmp = (vx[i]-vx[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(x[i]-x[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
-            tmp += (vy[i]-vy[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(y[i]-y[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
-            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
-            + pow(y[i] - ghostParticles.y[iP], 2);
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
 #if DIM == 3
-            tmp = (vz[i]-vz[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(z[i]-z[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
-            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+            dSqr += pow(z[i] - z[iP], 2);
 #endif
             r = sqrt(dSqr);
-            dEdt[i]  += m[i]*m[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]*P[i]/pow(rho[i],2)*tmp;
+            fij = 1 - 1 / m[iP]
+                    * kernelSize / (omega[i] * DIM) * drho[i]
+                        / (1 + kernelSize /(omega[i] * DIM) * dn[i]);
+            //fij = 1;
+            dEdt[i]  += m[iP]
+                        * ((vx[i]-vx[iP])
+                        * (x[i]-x[iP])
+                        + (vy[i]-vy[iP])
+                        * (y[i]-y[iP])
+#if DIM == 3
+                        + (vz[i]-vz[iP])*(z[i]-z[iP])
+#endif
+                        ) / r * P[i]/pow(rho[i],2)*fij*Kernel::dWdr(r, kernelSize)
+                        ;
         }
     }
 }
@@ -731,6 +741,7 @@ void Particles::calcdndrho(const Particles &ghostParticles, const double &kernel
         dn[i] = 0;
         drho[i] = 0;
         for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
             dSqr = pow(x[i] - x[iP], 2)
                         + pow(y[i] - y[iP], 2);
 #if DIM == 3
@@ -744,6 +755,7 @@ void Particles::calcdndrho(const Particles &ghostParticles, const double &kernel
                 * (DIM *Kernel::cubicSpline(r, kernelSize) + r / kernelSize * Kernel::dWdh(r, kernelSize));
         }
         for (int k = 0; k < noiGhosts[i]; k++){
+            iP = nnl[k+i*MAX_NUM_GHOST_INTERACTIONS];
             dSqr = pow(x[i] - ghostParticles.x[iP], 2)
             + pow(y[i] - ghostParticles.y[iP], 2);
 #if DIM == 3
@@ -1230,17 +1242,12 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
-<<<<<<< HEAD
             xj[0] = x[iP];
             xj[1] = y[iP];
-=======
-            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
-            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
-#if DIM == 3
-            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
-#endif
->>>>>>> main
 
+#if DIM == 3
+            xj[2] = z[iP];
+#endif
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] = 0.;
                 for (int beta = 0; beta < DIM; ++beta) {

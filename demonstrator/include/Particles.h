@@ -151,13 +151,11 @@ public:
 
     void updateStateAndPosition(const double &dt, const Domain &domain);
 
-<<<<<<< HEAD
 // //For DEBUGGING:
 //    void printDensity(const double &gamma);
-=======
+
     double pairwiseLimiter(double phi_0, double phi_i, double phi_j, double xijxi_abs, double xjxi_abs);
 
->>>>>>> main
 
 #if PERIODIC_BOUNDARIES
     void createGhostParticles(Domain &domain,
