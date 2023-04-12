@@ -2,7 +2,8 @@
 SHELL := /bin/bash
 
 # Set compiler
-CXX := mpic++
+#CXX := mpic++
+CXX := g++
 
 TRGTDIR := bin
 TARGET := mlh
@@ -84,7 +85,6 @@ include $(DEPENDS)
 
 prepare-run:
 	@mkdir -p output
-	@mkdir -p log
 
 # build module as shared library and install it on your system
 install: prepare-run | $(HOLIB)

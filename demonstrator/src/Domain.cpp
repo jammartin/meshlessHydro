@@ -10,7 +10,7 @@ void Domain::createGrid(const double &kernelSize){
     cellsX = floor((bounds.maxX - bounds.minX)/kernelSize);
     cellsY = floor((bounds.maxY - bounds.minY)/kernelSize);
 #if DIM == 3
-    cellsZ = ceil((bounds.maxZ - bounds.minZ)/kernelSize);
+    cellsZ = floor((bounds.maxZ - bounds.minZ)/kernelSize);
 #endif
 
 #if DIM == 2
@@ -24,8 +24,8 @@ void Domain::createGrid(const double &kernelSize){
     Logger(DEBUG) << "      > cellSizeX = " << cellSizeX << ", cellsX = " << cellsX;
     Logger(DEBUG) << "      > cellSizeY = " << cellSizeY<< ", cellsY = " << cellsY;
 #if DIM == 3
-    cellSizeZ = (domain.bounds.maxZ - domain.bounds.minZ)/(double)cellsZ;
-    Logger(DEBUG) << "      > cellSizeZ = " << cellSizeZ;
+    cellSizeZ = (bounds.maxZ - bounds.minZ)/(double)cellsZ;
+    Logger(DEBUG) << "      > cellSizeZ = " << cellSizeZ << ", cellsZ = " << cellsZ;
 #endif
 
     grid = std::vector<Cell>(numGridCells);
@@ -98,22 +98,31 @@ void Domain::getNeighborCells(const int &iCell, int *neighborCell){
             } else {
                 neighborCell[iNeighbor] = k+l*cellsX;
             }
+            ++iNeighbor;
 #else
-            for(int m=-1; m<=1; ++m){
+            for(int m=iZ-1; m<=iZ+1; ++m){
                 if (k < 0 || k >= cellsX){
                     neighborCell[iNeighbor] = -1; // -1: no cell or ghost
                 } else if (l < 0 || l >= cellsY) {
                     neighborCell[iNeighbor] = -1;
-                } else if (m < 0 || m >= cellsZ)
+                } else if (m < 0 || m >= cellsZ) {
                     neighborCell[iNeighbor] = -1;
                 } else {
                     neighborCell[iNeighbor] = k+l*cellsX+m*cellsX*cellsY;
                 }
+                ++iNeighbor;
             }
 #endif
-        ++iNeighbor;
         }
     }
+}
+
+void Domain::printout(){
+    Logger(INFO) << "Domain > X [" << bounds.minX << ", " << bounds.maxX << "]";
+    Logger(INFO) << "         Y [" << bounds.minY << ", " << bounds.maxY << "]";
+#if DIM == 3
+    Logger(INFO) << "         Z [" << bounds.minZ << ", " << bounds.maxZ << "]";
+#endif
 }
 
 Domain::~Domain(){

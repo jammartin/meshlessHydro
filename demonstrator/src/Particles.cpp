@@ -4,13 +4,15 @@
 
 #include "../include/Particles.h"
 
-//TODO: add for 3 dimensions
 double Kernel::cubicSpline(const double &r, const double &h) {
 
     // TODO: remove this
     double h2 = h/2.;
-
+#if DIM == 2
     const double sigma = 10./(7.*M_PI*h2*h2);
+#else // DIM == 3
+    const double sigma = 1./(M_PI*h2*h2*h2);
+#endif
     const double q = r/h2;
     if (0. <= q && q <= 1.){
         return sigma*(1.-3./2.*q*q*(1.-q/2.));
@@ -77,7 +79,6 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
     rhoGrad = new double[numParticles][DIM];
     vxGrad = new double[numParticles][DIM];
     vyGrad = new double[numParticles][DIM];
-    vzGrad = new double[numParticles][DIM];
     PGrad = new double[numParticles][DIM];
 
 #if RUNSPH
@@ -107,6 +108,7 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
 #if DIM == 3
     z = new double[numParticles];
     vz = new double[numParticles];
+    vzGrad = new double[numParticles][DIM];
 #endif
     omega = new double[numParticles];
     if (!ghosts){
@@ -134,10 +136,16 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
         WijRGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2];
         FijGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM+2]; // TODO: this buffer should not be needed
         vFrameGhosts = new double[numParticles*MAX_NUM_GHOST_INTERACTIONS][DIM];
-#endif
     } else {
         parent = new int[numParticles]; // store index of original node
+#endif
     }
+#if DEBUG_LVL > 1
+    if (ghosts){
+        // This is necessary for dumping ghosts to file
+        noi = new int[numParticles];
+    }
+#endif
 }
 
 Particles::~Particles() {
@@ -154,7 +162,6 @@ Particles::~Particles() {
     delete[] rhoGrad;
     delete[] vxGrad;
     delete[] vyGrad;
-    delete[] vzGrad;
     delete[] PGrad;
     delete[] omega;
 
@@ -190,6 +197,7 @@ Particles::~Particles() {
 #if DIM == 3
         delete[] z;
         delete[] vz;
+        delete[] vzGrad;
 #endif
         delete[] nnl;
         delete[] noi;
@@ -204,11 +212,60 @@ Particles::~Particles() {
         delete[] ghostMap;
         delete[] FijGhosts;
         delete[] vFrameGhosts;
-#endif
     } else {
         delete[] parent;
+#endif
     }
+#if DEBUG_LVL > 1
+    if (ghosts){
+        // This is necessary for dumping ghosts to file
+        delete[] noi;
+    }
+#endif
 }
+
+#if !PERIODIC_BOUNDARIES
+void Particles::getDomainLimits(double *domainLimits){
+
+    double minX { std::numeric_limits<double>::max() };
+    double maxX { std::numeric_limits<double>::min() };
+    double minY { std::numeric_limits<double>::max() };
+    double maxY { std::numeric_limits<double>::min() };
+#if DIM == 3
+    double minZ { std::numeric_limits<double>::max() };
+    double maxZ { std::numeric_limits<double>::min() };
+#endif
+
+    for(int i=0; i<N; ++i){
+        if (x[i] < minX){
+            minX = x[i];
+        } else if (x[i] > maxX){
+            maxX = x[i];
+        }
+        if (y[i] < minY){
+            minY = y[i];
+        } else if (y[i] > maxY){
+            maxY = y[i];
+        }
+#if DIM == 3
+        if (z[i] < minZ){
+            minZ = z[i];
+        } else if (z[i] > maxZ){
+            maxZ = z[i];
+        }
+#endif
+    }
+
+    domainLimits[0] = minX;
+    domainLimits[DIM] = maxX;
+    domainLimits[1] = minY;
+    domainLimits[DIM+1] = maxY;
+#if DIM == 3
+    domainLimits[2] = minZ;
+    domainLimits[DIM+2] = maxZ;
+#endif
+}
+#endif
 
 void Particles::assignParticlesAndCells(Domain &domain){
 
@@ -230,9 +287,17 @@ void Particles::assignParticlesAndCells(Domain &domain){
             floorY -= 1;
         }
 
+#if DIM==3
+        int floorZ = floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ);
+        if (floorZ == domain.cellsZ){
+            floorZ -= 1;
+        }
+#endif
+
+
         int iGrid = floorX + floorY * domain.cellsX
 #if DIM == 3
-        + floor((z[i]-domain.bounds.minZ)/domain.cellSizeZ) * domain.cellsX * domain.cellsY
+        + floorZ * domain.cellsX * domain.cellsY
 #endif
         ;
 
@@ -244,9 +309,18 @@ void Particles::assignParticlesAndCells(Domain &domain){
         //
         // Logger(DEBUG) << "floor x = " << floorX
         //          << ", floor y = " << floorY;
+<<<<<<< HEAD
         //
         // Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
         //          << "] to cell " << iGrid;
+=======
+
+        //Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
+//#if DIM == 3
+//                      << ", " << z[i]
+//#endif
+//                      << "] to cell " << iGrid;
+>>>>>>> main
         domain.grid[iGrid].prtcls.push_back(i);
         cell[i] = iGrid; // assign cells to particles
     }
@@ -287,6 +361,9 @@ void Particles::gridNNS(Domain &domain, const double &kernelSize){
                     }
                 }
             }
+        }
+        if (noiBuf == 0){
+            Logger(WARN) << "No neighbors for particle " << i << ". Caution.";
         }
         noi[i] = noiBuf;
     }
@@ -1153,8 +1230,16 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
+<<<<<<< HEAD
             xj[0] = x[iP];
             xj[1] = y[iP];
+=======
+            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#if DIM == 3
+            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+#endif
+>>>>>>> main
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] = 0.;
@@ -1213,6 +1298,12 @@ void Particles::compEffectiveFace(){
                 Aij[i*MAX_NUM_INTERACTIONS+j][alpha] = 1./omega[i]*psijTilde_xi[i*MAX_NUM_INTERACTIONS+j][alpha]
                         - 1./omega[ji]*psijTilde_xi[ij+ji*MAX_NUM_INTERACTIONS][alpha];
             }
+
+            //if(i < 10){
+            //    Logger(DEBUG) << "A[" << i << " -> " << ji << "] = [" << Aij[i*MAX_NUM_INTERACTIONS+j][0] << ", "
+            //                  << Aij[i*MAX_NUM_INTERACTIONS+j][1] << ", " << Aij[i*MAX_NUM_INTERACTIONS+j][2] << "], xi = ["
+            //                  << x[i] << ", " << y[i] << ", " << z[i] << "], xj = " << x[ji] << ", " << y[ji] << ", " << z[ji] << "]";
+            //}
         }
     }
 }
@@ -1269,10 +1360,13 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
+#if FIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + z[j])/2.;
+#else
             //xij[2] = z[i] + kernelSize/2. * (z[j] - z[i]);
             xij[2] = z[i] + kernelSize/4. * (z[j] - z[i]);
+#endif
             xijxi[2] = xij[2] - z[i];
-            // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
             if (psiMaxNgb < f[j]) psiMaxNgb = f[j];
             if (psiMinNgb > f[j]) psiMinNgb = f[j];
@@ -1299,12 +1393,14 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
             xijxi[0] = xij[0] - x[i];
             xijxi[1] = xij[1] - y[i];
 #if DIM == 3
+#if FIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + ghostParticles->z[j])/2.;
+#else
             //xij[2] = z[i] + kernelSize/2. * (ghostParticles->z[j] - z[i]);
-
             xij[2] = z[i] + kernelSize/4. * (ghostParticles->z[j] - z[i]);
+#endif
 
             xijxi[2] = xij[2] - z[i];
-            // TODO: add FIRST_ORDER_QUAD_POINT
 #endif
             if (psiMaxNgb < fGhost[j]) psiMaxNgb = fGhost[j];
             if (psiMinNgb > fGhost[j]) psiMinNgb = fGhost[j];
@@ -1345,6 +1441,48 @@ void Particles::slopeLimiter(double *f, double (*grad)[DIM], const double &kerne
     }
 }
 
+double Particles::compGlobalTimestep(const double &gamma, const double &kernelSize){
+    double dt_ = std::numeric_limits<double>::max();
+    for (int i=0; i<N; ++i){
+
+        double vSig = std::numeric_limits<double>::min();
+        double ci = sqrt(gamma*P[i]/rho[i]); // soundspeed @i
+
+        // searching for maximum signal speed
+        for (int jn=0; jn<noi[i]; ++jn){
+            int j = nnl[i*MAX_NUM_INTERACTIONS+jn];
+
+            double cj = sqrt(gamma*P[j]/rho[j]); // soundspeed @j
+
+            double xij[DIM], vij[DIM];
+
+            xij[0] = x[i] - x[j];
+            xij[1] = y[i] - y[j];
+
+            vij[0] = vx[i] - vx[j];
+            vij[1] = vy[i] - vy[j];
+
+#if DIM == 3
+            xij[2] = z[i] - z[j];
+            vij[2] = vz[i] - vz[j];
+#endif
+            double vijxij = Helper::dotProduct(vij, xij)/sqrt(Helper::dotProduct(xij, xij));
+            vijxij = vijxij < 0. ? vijxij : 0.;
+
+            double vSig_i = ci+cj-vijxij;
+            vSig = vSig_i > vSig ? vSig_i : vSig;
+
+        }
+
+        // TODO: Note: Kernel size is double the actual kernel size
+        double dt = CFL*kernelSize/vSig;
+        dt_ = dt < dt_ ? dt : dt_;
+    }
+
+    return dt_;
+}
+
+
 void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma){
     for (int i=0; i<N; ++i){
         double xij[DIM];
@@ -1383,6 +1521,11 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #endif
 
 #if DIM==3
+#if FIRST_ORDER_QUAD_POINT
+            xij[2] = (z[i] + z[j])/2.;
+            xijxj[2] = .5*(z[i] - z[j]);
+            xijxi[2] = .5*(z[j] - z[i]);
+#else
             xjxi[2] = z[j] - z[i];
             //xij[2] = z[i] + kernelSize/2. * xjxi[2];
 
@@ -1390,11 +1533,17 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 
             xijxi[2] = xij[2] - z[i];
             xijxj[2] = xij[2] - z[j];
-            // TODO: add FIRST_ORDER_QUAD_POINT
+#endif
 #endif
 
             int iW = i*MAX_NUM_INTERACTIONS+jn;
-
+#if !MOVE_PARTICLES
+            vFrame[iW][0] = 0.;
+            vFrame[iW][1] = 0.;
+#if DIM==3
+            vFrame[iW][2] = 0.;
+#endif
+#else // MOVE_PARTICLES
 #if FIRST_ORDER_QUAD_POINT
             vFrame[iW][0] = (vx[i] + vx[j])/2.;
             vFrame[iW][1] = (vy[i] + vy[j])/2.;
@@ -1411,6 +1560,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             vFrame[iW][2] = vz[i] + (vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 #endif
+#endif // MOVE_PARTICLES
             // boost frame to effective face
             WijR[iW][0] = rho[i];
             WijL[iW][0] = rho[j];
@@ -1423,6 +1573,14 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #if DIM == 3
             WijR[iW][4] = vz[i] - vFrame[iW][2];
             WijL[iW][4] = vz[j] - vFrame[iW][2];
+#endif
+
+#if PAIRWISE_LIMITER
+            double WijR_buf[DIM+2], WijL_buf[DIM+2];
+            for(int nu=0; nu<DIM+2; ++nu){
+                WijR_buf[nu] = WijR[iW][nu];
+                WijL_buf[nu] = WijL[iW][nu];
+            }
 #endif
 
             //if (i == 46){// && jn == 28){
@@ -1459,6 +1617,40 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             WijL[iW][4] += Helper::dotProduct(vzGrad[j], xijxj);
 #endif
 
+#if PAIRWISE_LIMITER
+            double xijxi_abs = 0., xijxj_abs = 0., xjxi_abs = 0.;
+            for(int alpha=0; alpha<DIM; ++alpha){
+                xijxi_abs += xijxi[alpha]*xijxi[alpha];
+                xijxj_abs += xijxj[alpha]*xijxj[alpha];
+                xjxi_abs += xjxi[alpha]*xjxi[alpha];
+            }
+            xijxi_abs = sqrt(xijxi_abs);
+            xijxj_abs = sqrt(xijxj_abs);
+            xjxi_abs = sqrt(xjxi_abs);
+
+            for(int nu=0; nu<DIM+2; ++nu){
+                WijR[iW][nu] = pairwiseLimiter(WijR[iW][nu], WijR_buf[nu], WijL_buf[nu], xijxi_abs, xjxi_abs);
+                WijL[iW][nu] = pairwiseLimiter(WijL[iW][nu], WijL_buf[nu], WijR_buf[nu], xijxj_abs, xjxi_abs);
+            }
+#endif
+
+#if DEBUG_LVL
+            if(WijR[iW][1] < 0. || WijL[iW][1] < 0.) {
+                Logger(WARN) << "FACE RECONSTRUCTION > Negative pressure encountered@(i = " << i << ", j = " << j << ")";
+                Logger(DEBUG) << "rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
+                              << ", uL = " << WijL[iW][2] << ", uR = " << WijR[iW][2]
+                              << ", PL = " << WijL[iW][1] << ", PR = " << WijR[iW][1]
+                              << ", PGrad[i] = [" << PGrad[i][0] << ", " << PGrad[i][1]
+#if DIM == 3
+                              << ", " << PGrad[i][2]
+#endif
+                              << "] , PGrad[j] = [" << PGrad[j][0] << ", " << PGrad[j][1]
+#if DIM == 3
+                              << ", " << PGrad[j][2]
+#endif
+                              << "]";
+            }
+#endif
             //if (i == 46){
             //    Logger(DEBUG) << "        j = " << j
             //                  << ", rhoL = " << WijL[iW][0] << ", rhoR = " << WijR[iW][0]
@@ -1473,19 +1665,58 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             viDiv += vzGrad[i][2];
             vjDiv += vzGrad[j][2];
 #endif
+            // density
             WijR[iW][0] -= dt/2. * (rho[i] * viDiv + (vx[i]-vFrame[iW][0])*rhoGrad[i][0] + (vy[i]-vFrame[iW][1])*rhoGrad[i][1]);
             WijL[iW][0] -= dt/2. * (rho[j] * vjDiv + (vx[j]-vFrame[iW][0])*rhoGrad[j][0] + (vy[j]-vFrame[iW][1])*rhoGrad[j][1]);
+
+            // energy
             WijR[iW][1] -= dt/2. * (gamma*P[i] * viDiv + (vx[i]-vFrame[iW][0])*PGrad[i][0] + (vy[i]-vFrame[iW][1])*PGrad[i][1]);
             WijL[iW][1] -= dt/2. * (gamma*P[j] * vjDiv + (vx[j]-vFrame[iW][0])*PGrad[j][0] + (vy[j]-vFrame[iW][1])*PGrad[j][1]);
-            // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff)
+
+            // velocities
+            // TODO: center vL and vR and update vFrame (compare to GIZMO code hydro_core_meshless.h:178ff) ??
             WijR[iW][2] -= dt/2. * (PGrad[i][0]/rho[i] + (vx[i]-vFrame[iW][0])*vxGrad[i][0] + (vy[i]-vFrame[iW][1])*vxGrad[i][1]);
-            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[i]-vFrame[iW][1])*vxGrad[j][1]);
+            WijL[iW][2] -= dt/2. * (PGrad[j][0]/rho[j] + (vx[j]-vFrame[iW][0])*vxGrad[j][0] + (vy[j]-vFrame[iW][1])*vxGrad[j][1]);
             WijR[iW][3] -= dt/2. * (PGrad[i][1]/rho[i] + (vx[i]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[i][1]);
-            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[i][0] + (vy[i]-vFrame[iW][1])*vyGrad[j][1]);
+            WijL[iW][3] -= dt/2. * (PGrad[j][1]/rho[j] + (vx[j]-vFrame[iW][0])*vyGrad[j][0] + (vy[j]-vFrame[iW][1])*vyGrad[j][1]);
 #if DIM==3
-            // TODO: update below for 3D
-            WijR[iW][4] -= dt/2. * PGrad[i][2]/rho[i];
-            WijL[iW][4] -= dt/2. * PGrad[j][2]/rho[j];
+            // density
+            WijR[iW][0] -= dt/2. * (vz[i]-vFrame[iW][2])*rhoGrad[i][2];
+            WijL[iW][0] -= dt/2. * (vz[j]-vFrame[iW][2])*rhoGrad[j][2];
+
+            // energy
+            WijR[iW][1] -= dt/2. * (vz[i]-vFrame[iW][2])*PGrad[i][2];
+            WijL[iW][1] -= dt/2. * (vz[j]-vFrame[iW][2])*PGrad[j][2];
+
+#if DEBUG_LVL
+            if(WijR[iW][1] < 0. || WijL[iW][1] < 0.) {
+                Logger(WARN) << "TIME PREDICTION > Negative pressure encountered@(i = " << i << ", j = " << j << ")";
+
+                double timePredP_i = dt / 2. * (gamma * P[i] * viDiv + (vx[i] - vFrame[iW][0]) * PGrad[i][0] +
+                                                (vy[i] - vFrame[iW][1]) * PGrad[i][1]
+#if DIM == 3
+                                                + (vz[i] - vFrame[iW][2]) * PGrad[i][2]
+#endif
+                );
+                Logger(DEBUG) << "Pressure timestep prediction term @i: " << timePredP_i;
+
+                double timePredP_j = dt / 2. * (gamma * P[j] * viDiv + (vx[j] - vFrame[iW][0]) * PGrad[j][0] +
+                                                (vy[j] - vFrame[iW][1]) * PGrad[j][1]
+#if DIM == 3
+                                                + (vz[j] - vFrame[iW][2]) * PGrad[j][2]
+#endif
+                );
+                Logger(DEBUG) << "Pressure timestep prediction term @j: " << timePredP_j;
+            }
+#endif
+
+            // velocities
+            WijR[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[i][2];
+            WijL[iW][2] -= dt/2. * (vz[i]-vFrame[iW][2])*vxGrad[j][2];
+            WijR[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[i][2];
+            WijL[iW][3] -= dt/2. * (vz[i]-vFrame[iW][2])*vyGrad[j][2];
+            WijR[iW][4] -= dt/2. * (PGrad[i][2]/rho[i] + (vx[i]-vFrame[iW][0])*vzGrad[i][0] + (vy[i]-vFrame[iW][1])*vzGrad[i][1] + (vz[i]-vFrame[iW][2])*vzGrad[i][2]);
+            WijL[iW][4] -= dt/2. * (PGrad[j][2]/rho[j] + (vx[j]-vFrame[iW][0])*vzGrad[j][0] + (vy[j]-vFrame[iW][1])*vzGrad[j][1] + (vz[j]-vFrame[iW][2])*vzGrad[j][2]);
 #endif
 
             //if (i == 46){// && jn == 28){
@@ -1497,6 +1728,58 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 
         }
     }
+}
+
+double Particles::pairwiseLimiter(double phi0, double phi_i, double phi_j, double xijxi_abs, double xjxi_abs) {
+    double phi_ = phi_i;
+
+    /// calculate helper values
+    double phi_ij = phi_i + xijxi_abs / xjxi_abs * (phi_j - phi_i);
+    double phiMin, phiMax;
+    if (phi_i < phi_j) {
+        phiMin = phi_i;
+        phiMax = phi_j;
+    } else {
+        phiMin = phi_j;
+        phiMax = phi_i;
+    }
+    double delta1 = PSI_1 * abs(phi_i - phi_j);
+    double delta2 = PSI_2 * abs(phi_i - phi_j);
+    double phiMinus, phiPlus;
+    if ((phiMax + delta1 >= 0. && phiMax >= 0.) || (phiMax + delta1 < 0. && phiMax < 0.)) {
+        phiPlus = phiMax + delta1;
+    } else {
+        phiPlus = phiMax / (1. + delta1 / abs(phiMax));
+    }
+    if ((phiMin - delta1 >= 0. && phiMin >= 0.) || (phiMin - delta1 < 0. && phiMin < 0.)) {
+        phiMinus = phiMin - delta1;
+    } else {
+        phiMinus = phiMin / (1. + delta1 / abs(phiMin));
+    }
+
+    /// actually compute the effective face limited value
+    if (phi_i < phi_j) {
+        double minPhiD2;
+        if (phi_ij + delta2 < phi0){
+            minPhiD2 = phi_ij + delta2;
+        } else {
+            minPhiD2 = phi0;
+        }
+
+        phi_ = phiMinus > minPhiD2 ? phiMinus : minPhiD2;
+
+    } else if (phi_i > phi_j){
+        double maxPhiD2;
+        if (phi_ij - delta2 > phi0){
+            maxPhiD2 = phi_ij - delta2;
+        } else {
+            maxPhiD2 = phi0;
+        }
+
+        phi_ = phiPlus < maxPhiD2 ? phiPlus : maxPhiD2;
+
+    }
+    return phi_;
 }
 
 void Particles::solveRiemannProblems(const double &gamma, const Particles &ghostParticles){
@@ -1527,14 +1810,25 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 
             if(WijR[ii][1] < 0. || WijL[ii][1] < 0.){
                 Logger(WARN) << "Negative pressure encountered@(i = " << i << ", j = " << j << ") Very bad :( !!";
-                Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
+                Logger(DEBUG) << "    > rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
                               << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
                               << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
-                              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
-#if DEBUG_LVL
+                              << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1]
+#if DIM ==3
+                              << ", " << Aij[ii][2]
+#endif
+                              << "]";
+
+#if DEBUG_LVL > 1
                 Logger(DEBUG) << "Aborting for debugging.";
                 exit(6);
 #endif
+                //if(WijR[ii][1] < 0.){
+                //    WijR[ii][1] = PRESSURE_FLOOR;
+                //}
+                //if(WijL[ii][1] < 0.){
+                //    WijL[ii][1] = PRESSURE_FLOOR;
+                //}
             }
 
             bool compute = true;
@@ -1646,8 +1940,9 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
             vF[i][0] += Fij[ii][2];
             vF[i][1] += Fij[ii][3];
-
-            // TODO: implement z-component to work for 3D
+#if DIM==3
+            vF[i][2] += Fij[ii][4];
+#endif
 
             /// ENERGY FLUXES
             // allocate buffer for energy update
@@ -1742,6 +2037,10 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
 
         // UPDATE MASS
         m[i] -= dt*mF[i];
+        if (m[i] <= 0.){
+            Logger(ERROR) << "Negative mass. m[" << i << "] =" << m[i] << ", mF = " << mF[i];
+            //m[i] = MASS_FLOOR;
+        }
 
         // UPDATE VELOCITY
         Q[1] -= dt*vF[i][0];
@@ -1753,21 +2052,32 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         vy[i] = Q[2]/m[i];
 #if DIM==3
         vz[i] = Q[3]/m[i];
+        //Logger(DEBUG) << "New velocity v = [" << vx[i] << ", " << vy[i] << ", " << vz[i] << "]";
 #endif
         // UPDATE INTERNAL ENERGY
         Q[0] -= dt*eF[i];
 #if DIM==3
-        u[i] = (Q[0]-.5*m[i]*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]))/m[i];
+        u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]);
+
+        //Logger(DEBUG) << "Total energy Q_E = " << Q[0] << ", kinetic energy E_kin = "
+        //          << .5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]);
+
 #else
         u[i] = Q[0]/m[i]-.5*(vx[i]*vx[i]+vy[i]*vy[i]);
 #endif
+        if (u[i] <= 0.){
+            Logger(ERROR) << "Negative internal energy. u[" << i << "] =" << u[i] << ", eF = " << eF[i];
+            //u[i] = ENERGY_FLOOR;
+        }
 
 #if MOVE_PARTICLES
         // MOVE PARTICLES
-        x[i] += .5*(vx[i]+vxi)*dt;
-        y[i] += .5*(vy[i]+vyi)*dt;
-        //x[i] += vxi*dt;
-        //y[i] += vyi*dt;<
+        //x[i] += .5*(vx[i]+vxi)*dt;
+        //y[i] += .5*(vy[i]+vyi)*dt;
+        // stay consistent with choice of effective frame
+        x[i] += vxi*dt;
+        y[i] += vyi*dt;
+
 #if DIM==3
         z[i] += .5*(vz[i]+vzi)*dt;
 #endif
@@ -1790,7 +2100,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         }
 #endif
 #endif
-#endif
+#endif // MOVE_PARTICLES
     }
 }
 
@@ -2266,7 +2576,13 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
 #endif
 
             int iW = i*MAX_NUM_GHOST_INTERACTIONS+jn;
-
+#if !MOVE_PARTICLES
+            vFrameGhosts[iW][0] = 0.;
+            vFrameGhosts[iW][1] = 0.;
+#if DIM==3
+            vFrameGhosts[iW][2] = 0.;
+#endif
+#else // !MOVE_PARTICLES
 #if FIRST_ORDER_QUAD_POINT
             vFrameGhosts[iW][0] = (vx[i] + ghostParticles.vx[j])/2.;
             vFrameGhosts[iW][1] = (vy[i] + ghostParticles.vy[j])/2.;
@@ -2283,6 +2599,7 @@ void Particles::compRiemannStatesLR(const double &dt, const double &kernelSize, 
             vFrameGhosts[iW][2] = vz[i] + (ghostParticles.vz[j]-vz[i]) * dotProd/dSqr;
 #endif
 #endif
+#endif // !MOVE_PARTICLES
             /*if(i == 394){
                 Logger(DEBUG) << "vFrame[0] = " << vFrameGhosts[iW][0]
                               << ", vFrame[1] = " << vFrameGhosts[iW][1]
@@ -2528,7 +2845,11 @@ double Particles::sumMass(){
 double Particles::sumEnergy(){
     double E = 0.;
     for (int i=0; i<N; ++i){
+#if DIM == 2
         E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]));
+#else
+        E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]));
+#endif
     }
     std::cout << "E is " <<  E << std::endl;
     return E;
@@ -2549,6 +2870,16 @@ double Particles::sumMomentumY(){
     }
     return momY;
 }
+
+#if DIM == 3
+double Particles::sumMomentumZ(){
+    double momZ = 0.;
+    for (int i=0; i<N; ++i){
+        momZ += m[i]*vz[i];
+    }
+    return momZ;
+}
+#endif
 
 void Particles::checkFluxSymmetry(Particles *ghostParticles){
     for (int i=0; i<N; ++i){
@@ -2584,6 +2915,13 @@ void Particles::checkFluxSymmetry(Particles *ghostParticles){
                              << " => Fij = " << Fij[ii][3] << ", Fji = " << Fij[iij][3];
                 notSym = true;
             }
+#if DIM == 3
+            if (Fij[iij][4] + Fij[ii][4] > FLUX_SYM_TOL){
+                Logger(WARN) << "  > Momentum fluxes (z) are NOT symmetric for " << i << " -> " << j
+                             << " => Fij = " << Fij[ii][4] << ", Fji = " << Fij[iij][4];
+                notSym = true;
+            }
+#endif
             if (notSym){
                 Logger(INFO) << "  > Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "], Aji = ["
                              << Aij[iij][0] << ", " << Aij[iij][1] << "]";
@@ -2633,7 +2971,7 @@ void Particles::checkFluxSymmetry(Particles *ghostParticles){
     }
 }
 
-void Particles::dump2file(std::string filename){
+void Particles::dump2file(std::string filename, double simTime){
     // open output file
     HighFive::File h5File { filename, HighFive::File::ReadWrite |
                                       HighFive::File::Create |
@@ -2645,6 +2983,15 @@ void Particles::dump2file(std::string filename){
     dataSpaceDims[1] = DIM;
 
     // create datasets
+    // TODO: Create a h5 object holding all meta data
+    HighFive::DataSet timeDataSet = h5File.createDataSet<double>("/time", HighFive::DataSpace(1));
+    HighFive::DataSet totalMassDataSet = h5File.createDataSet<double>("/totalMass", HighFive::DataSpace(1));
+    HighFive::DataSet energyDataSet = h5File.createDataSet<double>("/energy", HighFive::DataSpace(1));
+    HighFive::DataSet xMomDataSet = h5File.createDataSet<double>("/xMomentum", HighFive::DataSpace(1));
+    HighFive::DataSet yMomDataSet = h5File.createDataSet<double>("/yMomentum", HighFive::DataSpace(1));
+#if DIM == 3
+    HighFive::DataSet zMomDataSet = h5File.createDataSet<double>("/zMomentum", HighFive::DataSpace(1));
+#endif
     HighFive::DataSet rhoDataSet = h5File.createDataSet<double>("/rho", HighFive::DataSpace(N));
     HighFive::DataSet mDataSet = h5File.createDataSet<double>("/m", HighFive::DataSpace(N));
     HighFive::DataSet uDataSet = h5File.createDataSet<double>("/u", HighFive::DataSpace(N));
@@ -2652,12 +2999,23 @@ void Particles::dump2file(std::string filename){
     HighFive::DataSet velDataSet = h5File.createDataSet<double>("/v", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet rhoGradDataSet = h5File.createDataSet<double>("/rhoGrad", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet PDataSet = h5File.createDataSet<double>("/P", HighFive::DataSpace(N));
+    HighFive::DataSet noiDataSet = h5File.createDataSet<int>("/noi", HighFive::DataSpace(N));
+
 
     // containers for particle data
+    std::vector<double> timeVec({ simTime });
+    std::vector<double> totalMassVec({ sumMass() });
+    std::vector<double> energyVec({ sumEnergy() });
+    std::vector<double> xMomVec({ sumMomentumX() });
+    std::vector<double> yMomVec({ sumMomentumY() });
+#if DIM ==3
+    std::vector<double> zMomVec({ sumMomentumZ() });
+#endif
     std::vector<double> rhoVec(rho, rho+N);
     std::vector<double> mVec(m, m+N);
     std::vector<double> uVec(u, u+N);
     std::vector<double> PVec(P, P+N);
+    std::vector<int> noiVec(noi, noi+N);
 
     std::vector<std::vector<double>> posVec(N);
     std::vector<std::vector<double>> velVec(N);
@@ -2695,10 +3053,19 @@ void Particles::dump2file(std::string filename){
         rhoGradVec[i] = rhoGradBuf;
     }
     // write data
+    timeDataSet.write(timeVec); // dummy vec containing one element
+    totalMassDataSet.write(totalMassVec);
+    energyDataSet.write(energyVec);
+    xMomDataSet.write(xMomVec);
+    yMomDataSet.write(yMomVec);
+#if DIM == 3
+    zMomDataSet.write(zMomVec);
+#endif
     rhoDataSet.write(rhoVec);
     mDataSet.write(mVec);
     uDataSet.write(uVec);
     PDataSet.write(PVec);
+    noiDataSet.write(noi);
     posDataSet.write(posVec);
     velDataSet.write(velVec);
     rhoGradDataSet.write(rhoGradVec);

@@ -114,10 +114,26 @@ The plot can be generated in `snippets/volumePartition`.
 
 A 2D test case setup as described in [McNally et. al. (2012)](https://arxiv.org/abs/1111.1764). 
 
-<!--
+The folder `testcases/kelvin-helmholtz` contains all neccessary scripts and files to run a simulation of a Kelvin-Helmholtz test problem with periodic boundary conditions. The following steps need to be followed to achieve this:
+
+1. Generate an initial conditions file with the script `genrateIC.py`. Using the `-g` is strongly recommended. To create an initial condition file with 10000 particles you can run: `./generateIC.py -N 10000 -g`
+2. Copy the file `parameter.h` (or the file `parameter_long_run.h` and rename it to `parameter.h`) into the folder `demonstrator/include`replacing the existing file
+3. Copy the file `config.info` (or the file `config_long_run.h` and rename it to `config.info`) into the folder `demonstrator/` replacing the existing file
+4. Build the code by executing `make` in the folder `demonstrator`
+5. Run the program `demonstrator/bin/mlh`
+6. The results can be visualized with the script `densityPlotter.py` e.g: `./densityPlotter.py -o ../../demonstrator/output`
 
 ### Sedov blast wave
 
+A Sedov-Taylor-von Neumann blast wave testcase taken from [here](https://github.com/MichaelSt98/milupHPC/tree/main/testcases/sedov).
 
+Proceed analogously as for the Kelvi-Helmholtz testcase. This testcase throws some errors as it is not fully debugged yet. The preliminary results can be seen below.
+
+<img src="media/sedov3D.gif" alt="Sedov testcase cutted in x-y-plane" width="100%"/>
+
+<img src="media/sedovValid.gif" alt="Sedov testcase radial profiles" width="100%"/>
+
+
+<!--
 ### Keplerian disk
 -->

@@ -142,6 +142,7 @@ public:
     void compPressure(const double &gamma);
     void compEffectiveFace();
 
+    double compGlobalTimestep(const double &gamma, const double &kernelSize);
     void compRiemannStatesLR(const double &dt, const double &kernelSize, const double &gamma);
 
     void solveRiemannProblems(const double &gamma, const Particles &ghostParticles);
@@ -150,8 +151,13 @@ public:
 
     void updateStateAndPosition(const double &dt, const Domain &domain);
 
+<<<<<<< HEAD
 // //For DEBUGGING:
 //    void printDensity(const double &gamma);
+=======
+    double pairwiseLimiter(double phi_0, double phi_i, double phi_j, double xijxi_abs, double xjxi_abs);
+
+>>>>>>> main
 
 #if PERIODIC_BOUNDARIES
     void createGhostParticles(Domain &domain,
@@ -174,8 +180,8 @@ public:
     void dumpNNL(std::string filename, const Particles &ghostParticles);
 
     void printNoi();
-
-
+#else
+    void getDomainLimits(double *domainLimits);
 #endif
 
     /// function to move particles for testing purposes
@@ -187,9 +193,12 @@ public:
     double sumEnergy();
     double sumMomentumX();
     double sumMomentumY();
+#if DIM==3
+    double sumMomentumZ();
+#endif
     void checkFluxSymmetry(Particles *ghostParticles=nullptr);
 
-    void dump2file(std::string filename);
+    void dump2file(std::string filename, double simTime);
 
 private:
     int *nnl; // nearest neighbor list

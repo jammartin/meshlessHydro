@@ -22,8 +22,33 @@ void MeshlessScheme::run(){
     double t = 0;
     int step = 0;
 
+#if ADAPTIVE_TIMESTEP
+    int numDumpTimes = (int)(config.timeEnd/config.timeStep)/config.h5DumpInterval+1;
+    Logger(DEBUG) << "      > Times for file dump: " << numDumpTimes;
+    double dumpTimes[numDumpTimes];
+    for(int iDump=0; iDump<numDumpTimes; ++iDump){
+        dumpTimes[iDump] = iDump*config.timeStep*config.h5DumpInterval;
+        Logger(DEBUG) << "        dumpTimes[" << iDump << "] = " << dumpTimes[iDump];
+    }
+    int dumpStep = 0;
+    bool dump = true;
+    bool dumpNext = false;
+#endif
+
+
     do {
         Logger(INFO) << "  > TIME: " << t << ", STEP: " << step;
+#if !PERIODIC_BOUNDARIES
+        Logger(INFO) << "    > Computing domain limits ...";
+        double domainLimits[DIM*2];
+        particles->getDomainLimits(domainLimits);
+        Domain::Cell boundingBox { domainLimits };
+        domain.bounds = boundingBox;
+        domain.printout();
+        Logger(DEBUG) << "      > ... creating grid ...";
+        domain.createGrid(config.kernelSize);
+        Logger(INFO) << "    > ... done.";
+#endif
         Logger(INFO) << "    > Assigning particles ...";
         particles->assignParticlesAndCells(domain);
         Logger(INFO) << "    > ... done.";
@@ -59,7 +84,25 @@ void MeshlessScheme::run(){
         Logger(DEBUG) << "      SANITY CHECK > E_tot = " << particles->sumEnergy();
         Logger(DEBUG) << "      SANITY CHECK > px_tot = " << particles->sumMomentumX();
         Logger(DEBUG) << "      SANITY CHECK > py_tot = " << particles->sumMomentumY();
+#if DIM == 3
+        Logger(DEBUG) << "      SANITY CHECK > pz_tot = " << particles->sumMomentumZ();
+#endif
 
+#if ADAPTIVE_TIMESTEP
+        Logger(INFO) << "    > Selecting global timestep ... ";
+        timeStep = particles->compGlobalTimestep(config.gamma, config.kernelSize);
+        //Logger(INFO) << "Time  > dt = " << timeStep << " selected.";
+        if(dumpStep >= numDumpTimes){
+            Logger(ERROR) << "Simulation did not abort after reaching timeEnd. Exiting.";
+            exit(9);
+        } else if(t+timeStep>=dumpTimes[dumpStep+1]){
+            dumpNext = true;
+            timeStep = dumpTimes[dumpStep+1]-t;
+        }
+        Logger(INFO) << "Time  > dt = " << timeStep << " selected.";
+#else
+        timeStep = config.timeStep;
+#endif
 
         Logger(INFO) << "    > Computing gradients";
 #if PERIODIC_BOUNDARIES
@@ -107,27 +150,44 @@ void MeshlessScheme::run(){
         particles->compEffectiveFace(ghostParticles);
 #endif
         Logger(DEBUG) << "      > Computing fluxes";
-        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma);
+        particles->compRiemannStatesLR(timeStep, config.kernelSize, config.gamma);
 
 #if PERIODIC_BOUNDARIES
         Logger(DEBUG) << "      > Computing ghost fluxes";
-        particles->compRiemannStatesLR(config.timeStep, config.kernelSize, config.gamma,
+        particles->compRiemannStatesLR(timeStep, config.kernelSize, config.gamma,
                                      ghostParticles);
         //Logger(DEBUG) << "Aborting for debugging.";
         //exit(6);
 
 #endif
+
+#if ADAPTIVE_TIMESTEP
+        if (dump){
+            dump = false;
+
+#else
         if (step % config.h5DumpInterval == 0) {
+#endif // ADAPTIVE_TIMESTEP
+
             std::stringstream stepss;
             Logger(INFO) << "   > Dump particle distribution";
-            stepss << std::setw(6) << std::setfill('0') << step;
+
+            stepss << std::setw(6) << std::setfill('0')
+#if ADAPTIVE_TIMESTEP
+            << dumpStep;
+#else
+            << step;
+#endif // ADAPTIVE_TIMESTEP
+
             Logger(INFO) << "      > Dump particles to file";
-            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
+            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"), t);
+
+            ++dumpStep;
 
 #if DEBUG_LVL > 1
 #if PERIODIC_BOUNDARIES
             Logger(INFO) << "      > Dump ghosts to file";
-            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"));
+            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"), t);
             Logger(INFO) << "      > Dump NNL to file";
             particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
 #endif
@@ -138,8 +198,12 @@ void MeshlessScheme::run(){
             break;
         }
 
+
         Logger(INFO) << "    > Solving Riemann problems";
 #if PERIODIC_BOUNDARIES
+        particles->solveRiemannProblems(config.gamma, ghostParticles);
+#else
+        Particles ghostParticles { 0, true }; // DUMMY
         particles->solveRiemannProblems(config.gamma, ghostParticles);
 #endif
 
@@ -157,14 +221,21 @@ void MeshlessScheme::run(){
         //particles->collectFluxes(helper, ghostParticles); // TODO: argument ghost particles is unnecessary
 //#endif
         Logger(INFO) << "    > Updating state";
-        particles->updateStateAndPosition(config.timeStep, domain);
+        particles->updateStateAndPosition(timeStep, domain);
 
         //Logger(INFO) << "    > Moving particles";
         //particles->move(config.timeStep, domain);
 
-        t += config.timeStep;
+        t += timeStep;
         ++step;
-        //break;
+
+#if ADAPTIVE_TIMESTEP
+        if (dumpNext){
+            dump = true;
+            dumpNext = false;
+        }
+#endif // ADAPTIVE_TIMESTEP
+
         //Logger(DEBUG) << "    > t = " << t << ", step =  " << step
         //          << ", t_end = " << config.timeEnd;
 
@@ -179,7 +250,7 @@ void MeshlessScheme::run(){
         //particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"));
         // END DEBUGGING
 
-    } while(t<config.timeEnd+config.timeStep);
+    } while(t<config.timeEnd+timeStep);
 }
 
 MeshlessScheme::~MeshlessScheme(){}

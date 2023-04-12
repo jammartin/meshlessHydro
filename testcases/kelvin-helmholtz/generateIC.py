@@ -13,19 +13,22 @@ rho1 = 1.
 Dy = .025
 P = 5./2.
 gamma = 5./3.
-Drho = .5
+Drho = (rho1-rho2)/2.
 dvy0 = .01
+v1 = .5
+v2 = -.5
+Dv = (v1-v2)/2.
 
 def getVelsX(y):
     velsX = np.empty(len(y))
     mask1 = y<.25
-    velsX[mask1] = -.5+.5*np.exp((y[mask1]-.25)/Dy)
+    velsX[mask1] = v1-Dv*np.exp((y[mask1]-.25)/Dy)
     mask2 = (.25<=y) & (y<.5)
-    velsX[mask2] = .5-.5*np.exp((.25-y[mask2])/Dy)
+    velsX[mask2] = v2+Dv*np.exp((.25-y[mask2])/Dy)
     mask3 = (.5<=y) & (y<=.75)
-    velsX[mask3] = .5-.5*np.exp((y[mask3]-.75)/Dy)
+    velsX[mask3] = v2+Dv*np.exp((y[mask3]-.75)/Dy)
     mask4 = .75<y
-    velsX[mask4] = -.5+.5*np.exp((.75-y[mask4])/Dy)
+    velsX[mask4] = v1-Dv*np.exp((.75-y[mask4])/Dy)
     return velsX
 
 def getVelsXTest(y):
@@ -45,13 +48,13 @@ def getDensities(y):
     densities = np.empty(len(y))
     
     mask1 = y<.25
-    densities[mask1] = rho2-Drho*np.exp((y[mask1]-.25)/Dy)
+    densities[mask1] = rho1-Drho*np.exp((y[mask1]-.25)/Dy)
     mask2 = (.25<=y) & (y<.5)
-    densities[mask2] = rho1+Drho*np.exp((.25-y[mask2])/Dy)
+    densities[mask2] = rho2+Drho*np.exp((.25-y[mask2])/Dy)
     mask3 = (.5<=y) & (y<=.75)
-    densities[mask3] = rho1+Drho*np.exp((y[mask3]-.75)/Dy)
+    densities[mask3] = rho2+Drho*np.exp((y[mask3]-.75)/Dy)
     mask4 = .75<y
-    densities[mask4] = rho2-Drho*np.exp((.75-y[mask4])/Dy)
+    densities[mask4] = rho1-Drho*np.exp((.75-y[mask4])/Dy)
 
     return densities
     
@@ -107,7 +110,7 @@ if __name__=="__main__":
     # create specific internal energy
     u = P/((gamma-1.)*rho) #-.5*np.linalg.norm(vel, axis=1)**2.
 
-    pos = pos - [.5, .5] # transform for symmetry around origin
+    #pos = pos - [.5, .5] # transform for symmetry around origin
     
     outH5.create_dataset("x", data=pos) 
     outH5.create_dataset("v", data=vel)

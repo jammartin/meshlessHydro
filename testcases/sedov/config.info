@@ -1,0 +1,33 @@
+; h5 file containing the initial particle distribution
+initFile ../testcases/sedov/sedov_N31.h5
+
+; output directory for particle distribution h5 files
+outDir output
+
+; fixed time step
+; ignored when ADAPTIVE_TIMESTEP is set in parameter.h
+timeStep .005
+
+; end of the simulation
+timeEnd 10.
+
+; output particle distribution each h5DumpInterval steps
+h5DumpInterval 1
+
+; periodic boundaries of box
+; ignored when PERIODIC_BOUNDARIES is not set in parameter.h
+periodicBoxLimits {
+    lowerX -.5
+    lowerY -.5
+    lowerZ 0.
+    upperX .5
+    upperY .5
+    upperZ 0.
+}
+
+// TODO: this is implemented as half the kernel size
+; kernel size for meshless scheme
+kernelSize .07
+
+; adiabatic index
+gamma 1.6666666666666667
