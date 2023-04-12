@@ -21,6 +21,47 @@ double Kernel::cubicSpline(const double &r, const double &h) {
     }
 }
 
+// // dW(r, h)/dr. Scalar. For needs to be multiplied with (x_i - x_j)/r
+// // For 2d SPH only
+// double Kernel::dWdr(const double &r, const double &h){
+//     const double sigma = 10./(7.*M_PI*h*h*h);
+//     const double q = r/h;
+//     if (0. <= q && q <= 1./2.){
+//         return sigma * (- 3 * q + 9./4. * q * q);
+//     } else if (1./2. < q && q < 1.){
+//         return sigma * -1 * 0.75 * pow((2 - q), 2);
+//     } else {
+//         return 0.;
+//     }
+// };
+
+// dW(r, h)/dr. Scalar. For needs to be multiplied with (x_i - x_j)/r
+// For 2d SPH only
+double Kernel::dWdr(const double &r, const double &h){
+    const double sigma = 40./(7.*M_PI);
+    const double q = r/h;
+    if (0. <= q && q < 1./2.){
+        return 6 * sigma / pow(h, DIM + 1) * (3*pow(q, 2) - 2 * q);
+    } else if (1./2. <= q && q <= 1.){
+        return 6 * sigma / pow(h, DIM + 1) * -1 * pow((1 - q), 2);
+    } else {
+        return 0.;
+    }
+};
+
+// dW/dh
+double Kernel::dWdh(const double &r, const double &h){
+    const double sigma = 40./(7.*M_PI*h*h*h);
+    const double q = r/h;
+    if (0. <= q && q <= 1./2.){
+        return 2 * sigma / pow(h, 6) * (12 * h * r*r - pow(h, 3) - 15 * pow(r, 3));
+    } else if (1./2. < q && q < 1.){
+        return 2 * sigma / pow(h, 6) * pow((h - r), 2) * (5 * r - 2 * h);
+    } else {
+        return 0.;
+    }
+}
+
 Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts { ghosts }{
     // allocate memory
     matId = new int[numParticles];
@@ -39,6 +80,27 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
     vzGrad = new double[numParticles][DIM];
     PGrad = new double[numParticles][DIM];
 
+#if RUNSPH
+    ax = new double[numParticles];
+    ay = new double[numParticles];
+
+    // ArtVisc thingy
+    cs = new double[numParticles];
+    dudtArtVisc = new double[numParticles];
+
+    axArtVisc = new double[numParticles];
+    ayArtVisc = new double[numParticles];
+#if DIM == 3
+    az = new double[numParticles];
+    azArtVisc = new double[numParticles];
+#endif
+
+
+	//unimportant = new double[numParticles];
+	dEdt = new double[numParticles];
+	dn = new double[numParticles];
+	drho = new double[numParticles];
+#endif
 
     //TODO: check if this is needed as array
     //B = new double[numParticles][DIM*DIM];
@@ -95,6 +157,26 @@ Particles::~Particles() {
     delete[] vzGrad;
     delete[] PGrad;
     delete[] omega;
+
+#if RUNSPH
+	//delete[] unimportant;
+	delete[] dEdt;
+	delete[] dn;
+	delete[] drho;
+
+    delete[] ax;
+    delete[] ay;
+
+    delete[] cs;
+    delete[] dudtArtVisc;
+
+    delete[] axArtVisc;
+    delete[] ayArtVisc;
+#if DIM == 3
+    delete[] az;
+    delete[] azArtVisc;
+#endif
+#endif
 
     if (!ghosts) {
         delete[] psijTilde_xi;
@@ -154,16 +236,16 @@ void Particles::assignParticlesAndCells(Domain &domain){
 #endif
         ;
 
-        //if (floorX >= domain.cellsX || floorY >= domain.cellsY){
+        // if (floorX >= domain.cellsX || floorY >= domain.cellsY){
         //    Logger(ERROR) << "  > Particle i = " << i << " cannot be properly assigned to search grid.";
         //    Logger(ERROR) << "    > x = " << x[i] << " -> floorX = " << floorX
         //                  << ", y = " << y[i] << " -> floorY = " << floorY;
-        //}
-
-        //Logger(DEBUG) << "floor x = " << floorX
+        // }
+        //
+        // Logger(DEBUG) << "floor x = " << floorX
         //          << ", floor y = " << floorY;
-
-        //Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
+        //
+        // Logger(DEBUG) << "      > Assigning particle@" << i << " = [" << x[i] << ", " << y[i]
         //          << "] to cell " << iGrid;
         domain.grid[iGrid].prtcls.push_back(i);
         cell[i] = iGrid; // assign cells to particles
@@ -210,37 +292,815 @@ void Particles::gridNNS(Domain &domain, const double &kernelSize){
     }
 }
 
+#if RUNSPH
+// For comparable ICs: This sets the internal energies so that P = 2.5 everywhere
+void Particles::setInternalEnergy(double Pressure, const double gamma){
+    for (int i = 0; i < N; i++){
+        u[i] = Pressure / ((gamma - 1) * rho[i]);
+    }
+}
+
+// Computes the density via kernel smoothing w/o ghost particles
+void Particles::compDensitySPH(const double &kernelSize){
+    double dnst;
+    double dSqr;
+    double r;
+    int iP;
+    for (int i = 0; i < N; i++){
+        dnst = 0;
+        dSqr = 0;
+        r = 0.;
+        for(int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            dnst += m[i] * kernel(r, kernelSize);
+            // For normalization, as in compOmega: Add self interaction
+            rho[i] = dnst + m[j] * kernel(0., kernelSize);
+        }
+    }
+}
+
+
+void Particles::compAccSPH(const double &kernelSize){
+    int iP;
+    double dSqr;
+    double r;
+    double PRhoHost;
+    double PRhoTarget;
+    double PIij;
+    for (int i = 0; i < N; i++){
+        ax[i] = 0;
+        ay[i] = 0;
+        #if DIM == 3
+        az[i] = 0;
+        #endif
+        PRhoHost = P[i] / pow(rho[i], 2);
+        for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+
+            dSqr = pow(x[i] - x[iP], 2)
+            + pow(y[i] - y[iP], 2);
+            #if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+            #endif
+            r = sqrt(dSqr);
+            PRhoTarget =  P[j] / pow(rho[j], 2);
+            #if ARTVISC
+            PIij = compPIij(i, iP, ALPHA_VISC, BETA_VISC, kernelSize);
+            ax[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
+            ay[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
+
+            //ax[i] -= m[j] * (PRhoHost + PRhoTarget) * (x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            //ay[i] -= m[j] * (PRhoHost + PRhoTarget) * (y[i] - y[j])/r * Kernel::dWdr(r, kernelSize);
+            // Logger(DEBUG) << i << " " << j << " " << m[j]*(PRhoHost+PRhoTarget)*(x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            #if DIM == 3
+            az[i] -= m[j]*(PRhoHost+PRhoTarget+PIij)*(z[i] - z[j])/r * Kernel::dWdr(r, kernelSize);
+            #endif
+            #else
+            ax[i] += m[iP] * (PRhoHost+PRhoTarget)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
+            ay[i] += m[iP] * (PRhoHost+PRhoTarget)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
+
+            //ax[i] -= m[j] * (PRhoHost + PRhoTarget) * (x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            //ay[i] -= m[j] * (PRhoHost + PRhoTarget) * (y[i] - y[j])/r * Kernel::dWdr(r, kernelSize);
+            // Logger(DEBUG) << i << " " << j << " " << m[j]*(PRhoHost+PRhoTarget)*(x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            #if DIM == 3
+            az[i] -= m[j]*(PRhoHost+PRhoTarget)*(z[i] - z[j])/r * Kernel::dWdr(r, kernelSize);
+            #endif
+            ax[i] -= m[i]*(PRhoHost+PRhoTarget)*(x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            ay[i] -= m[i]*(PRhoHost+PRhoTarget)*(y[i] - y[j])/r * Kernel::dWdr(r, kernelSize);
+            #if DIM == 3
+            az[i] -= m[i]*(PRhoHost+PRhoTarget)*(z[i] - z[j])/r * Kernel::dWdr(r, kernelSize);
+            #endif
+            #endif
+        }
+    }
+}
+
+
+// Euler intgration for SPH
+void Particles::eulerSPH(const double &dt, const Domain &domain){
+    double scale = 1;
+    double vyTmp;
+    for (int i = 0; i < N; i++){
+        vyTmp = x[i];
+        vx[i] += ax[i]*dt;
+        vy[i] += ay[i]*dt;
+#if DIM == 3
+        vz[i] += dt * az[i];
+#endif
+
+        // if (i % 100 == 0){
+        //     Logger(DEBUG) << "dvx is " << vy[i] - vyTmp;
+        // }
+        x[i] += vx[i]*dt;
+        y[i] += vy[i]*dt;
+#if DIM == 3
+        z[i] += az[i]*dt*dt;
+#endif
+
+#if PERIODIC_BOUNDARIES
+        if (x[i] < domain.bounds.minX) {
+            x[i] = domain.bounds.maxX - (domain.bounds.minX - x[i]);
+        }
+        else if (domain.bounds.maxX <= x[i]) {
+            //Logger(DEBUG) << "X is " << x[i];
+            x[i] = domain.bounds.minX + (x[i] - domain.bounds.maxX);
+        }
+        if (y[i] < domain.bounds.minY) {
+            y[i] = domain.bounds.maxY - (domain.bounds.minY - y[i]);
+        }
+        else if (domain.bounds.maxY <= y[i]) {
+            y[i] = domain.bounds.minY + (y[i] - domain.bounds.maxY);
+        }
+#if DIM ==3
+        if (z[i] < domain.bounds.minZ) {
+            z[i] = domain.bounds.maxZ - (domain.bounds.minZ - z[i]);
+        }
+        else if (domain.bounds.maxZ <= z[i]) {
+            z[i] = domain.bounds.minZ + (z[i] - domain.bounds.maxZ);
+        }
+#endif
+#endif
+
+        // Check if particles are out of bounds
+        // if (x[i] > domain.bounds.maxX){
+            //     Logger(DEBUG) << "X is too big, out of bounds";
+            // }
+    }
+}
+
+
+// SPH energy computation functions:
+void Particles::compuis(const double &dt, const double &kernelSize){
+    //double u_i_old;
+    for (int i = 0; i < N; i++){
+        //u_i_old = u[i];
+        u[i] += dEdt[i] * dt;
+#if ARTVISC
+        u[i] += dudtArtVisc[i] * dt;
+#endif
+        //std::cout << "u_" << i << ": " << u[i] << ", was " << u_i_old << std::endl;;
+        if (u[i] < 0){
+            Logger(DEBUG) << "+++DANGER+++";
+        }
+    }
+}
+
+
+// Computing all omegas:
+void Particles::compOmegas(const double &kernelSize){
+    for (int i = 0; i < N; i++){
+        compOmega(i, kernelSize);
+    }
+}
+
+// Implementing equations F5 and F6 in Hopkins` GIZMO Paper
+void Particles::calcdndrho(const double &kernelSize){
+    double r, dSqr, tmp;
+    for (int i = 0; i < N; i++){
+        dn[i] = 0;
+        drho[i] = 0;
+        for (int j = 0; j < noi[i]; j++){
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            dn[i] -= 1 / kernelSize * (DIM * Kernel::cubicSpline(r, kernelSize) + r*Kernel::dWdr(r, kernelSize));
+            drho[i] -= m[iP]*1 / kernelSize * (DIM * Kernel::cubicSpline(r, kernelSize) + r*Kernel::dWdr(r, kernelSize));
+        }
+    }
+}
+
+// Implementing the sum in equation F3 in Hopkins` GIZMO Paper
+void Particles::calcdE(const double &kernelSize){
+    double tmp, dSqr, r, fij;
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < noi[i]; j++){
+            tmp = (vx[i]-vx[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(x[i]-x[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
+            tmp += (vy[i]-vy[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(y[i]-y[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+            + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            tmp = (vz[i]-vz[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]])*(z[i]-z[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]);
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            dEdt[i]  += m[i]*m[nnl[j+i*MAX_NUM_GHOST_INTERACTIONS]]*P[i]/pow(rho[i],2)*tmp;
+        }
+    }
+}
+
+#if PERIODIC_BOUNDARIES
+
+// Computes the density via kernel smoothing w/ ghost particles
+void Particles::compDensitySPH(const Particles &ghostParticles, const double &kernelSize){
+    int iP;
+    double dnst;
+    double dSqr;
+    double r;
+    double ghostMass;
+    for (int i = 0; i < N; ++i){
+        dnst = 0;
+        for(int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            dSqr = pow((x[i] - x[iP]), 2)
+                        + pow((y[i] - y[iP]), 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+
+            //Logger(DEBUG) << "density: i = " << i << ", j = " << iP << ", r = " << r;
+
+            dnst += m[iP] * kernel(r, kernelSize);
+        }
+        // For normalization: Self interaction
+        dnst += m[i] * kernel(0., kernelSize);
+
+        // Ghosts
+        //Logger(DEBUG) << "i: " << i << " noiGhosts: " << noiGhosts[i];
+        //Logger(DEBUG) << "Random ghost mass: " << ghostParticles.m[0];
+#if PERIODIC_BOUNDARIES
+        for(int k = 0; k < noiGhosts[i]; ++k){
+            iP = nnlGhosts[k+i*MAX_NUM_GHOST_INTERACTIONS];
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+                          + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            dnst += m[ghostParticles.parent[iP]] * kernel(r, kernelSize);
+            //Logger(DEBUG) << "k = " << k << " mass:  " << m[ghostParticles.parent[iP]] << " W: " << kernel(r,kernelSize);
+        }
+#endif
+        // if ((i - 0) % 30 == 0){
+        //     Logger(DEBUG) << "density from ghosts: i = " << i << ", dnst = " << dnst;
+        // }
+        rho[i] = dnst;
+    }
+}
+
+
+void Particles::compAccSPH(const Particles &ghostParticles, const double &kernelSize){
+    int iP;
+    // Calculate acceleration for each particle, w/o Ghosts
+    // c.f. eq 8 in Monaghan: SPH and its diverse Applications, Annu.Rev. Fluid mechanics, 2012
+    double dSqr;
+    double r;
+    double PRhoHost;
+    double PRhoTarget;
+    double PIij;
+    for (int i = 0; i < N; i++){
+        ax[i] = 0;
+        ay[i] = 0;
+#if DIM == 3
+        az[i] = 0;
+#endif
+        PRhoHost = P[i] / pow(rho[i], 2);
+        for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            PRhoTarget =  P[iP] / pow(rho[iP], 2);
+#if ARTVISC
+            PIij = compPIij(i, iP, 1.5, 3, kernelSize);
+            ax[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
+            ay[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
+
+            //ax[i] -= m[j] * (PRhoHost + PRhoTarget) * (x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+            //ay[i] -= m[j] * (PRhoHost + PRhoTarget) * (y[i] - y[j])/r * Kernel::dWdr(r, kernelSize);
+            // Logger(DEBUG) << i << " " << j << " " << m[j]*(PRhoHost+PRhoTarget)*(x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+#if DIM == 3
+            az[i] -= m[j]*(PRhoHost+PRhoTarget+PIij)*(z[i] - z[j])/r * Kernel::dWdr(r, kernelSize);
+#endif
+#else
+            ax[i] += m[iP] * (PRhoHost+PRhoTarget)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
+            ay[i] += m[iP] * (PRhoHost+PRhoTarget)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
+
+//ax[i] -= m[j] * (PRhoHost + PRhoTarget) * (x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+//ay[i] -= m[j] * (PRhoHost + PRhoTarget) * (y[i] - y[j])/r * Kernel::dWdr(r, kernelSize);
+// Logger(DEBUG) << i << " " << j << " " << m[j]*(PRhoHost+PRhoTarget)*(x[i] - x[j])/r * Kernel::dWdr(r, kernelSize);
+#if DIM == 3
+            az[i] -= m[j]*(PRhoHost+PRhoTarget)*(z[i] - z[j])/r * Kernel::dWdr(r, kernelSize);
+#endif
+#endif
+        }
+
+        // Ghosts
+        for (int k = 0; k < noiGhosts[i]; k++){
+            iP = nnlGhosts[k+i*MAX_NUM_GHOST_INTERACTIONS];
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+                          + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            PRhoTarget = ghostParticles.P[iP]
+                / pow(ghostParticles.rho[iP], 2);
+#if ArtVisc
+            PIij = compPIij(ghostParticles, i, iP, 1.5, 3, kernelSize);
+            ax[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget+PIij)
+                * (x[i] - ghostParticles.x[iP])
+                    / r * Kernel::dWdr(r, kernelSize);
+            ay[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget+PIij)
+                * (y[i] - ghostParticles.y[iP])
+                    / r * Kernel::dWdr(r, kernelSize);
+#if DIM == 3
+            az[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget+PIij)
+                * (z[i] - ghostParticles.z[iP]) / r * Kernel::dWdr(r, kernelSize);
+#endif
+#else
+            ax[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget)
+                * (x[i] - ghostParticles.x[iP])
+                    / r * Kernel::dWdr(r, kernelSize);
+            ay[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget)
+                * (y[i] - ghostParticles.y[iP])
+                    / r * Kernel::dWdr(r, kernelSize);
+#if DIM == 3
+            az[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget)
+                * (z[i] - ghostParticles.z[iP]) / r * Kernel::dWdr(r, kernelSize);
+#endif
+#endif
+        }
+        // Logger(DEBUG) << "For i = " << i << ", ax and ay are " << ax[i] << " and " << ay[i];
+    }
+}
+
+// Compute all omegas
+void Particles::compOmegas(const Particles &ghostParticles, const double &kernelSize){
+    for (int i = 0; i < N; i++){
+        compOmega(i, ghostParticles, kernelSize);
+        //std::cout << i << " " << omega[i] << std::endl;
+    }
+}
+
+// Implementing equations F5 and F6 in Hopkins` GIZMO Paper
+void Particles::calcdndrho(const Particles &ghostParticles, const double &kernelSize){
+    int iP;
+    double r, dSqr, tmp;
+    for (int i = 0; i < N; i++){
+        dn[i] = 0;
+        drho[i] = 0;
+        for (int j = 0; j < noi[i]; j++){
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+
+            dn[i] -= 1 / kernelSize
+                * (DIM *Kernel::cubicSpline(r, kernelSize) + r / kernelSize * Kernel::dWdh(r, kernelSize));
+            drho[i] -= m[iP] / kernelSize
+                * (DIM *Kernel::cubicSpline(r, kernelSize) + r / kernelSize * Kernel::dWdh(r, kernelSize));
+        }
+        for (int k = 0; k < noiGhosts[i]; k++){
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+            + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            dn[i] -= 1 / kernelSize
+                * (DIM * Kernel::cubicSpline(r, kernelSize) + r/kernelSize * Kernel::dWdh(r, kernelSize));
+            drho[i] -= m[ghostParticles.parent[iP]] / kernelSize
+                * (DIM * Kernel::cubicSpline(r, kernelSize) + r/kernelSize * Kernel::dWdh(r, kernelSize));
+        }
+        //std::cout << "For i = " << i <<", drho is " << drho[i] << " dn " << dn[i] << " m " << m[i] << std::endl;
+    }
+}
+
+
+// Implementing equation F3 in Hopkins` GIZMO Paper
+void Particles::calcdE(const Particles &ghostParticles, const double &kernelSize){
+    int iP;
+    double dSqr, r, fij;
+    for (int i = 0; i < N; i++){
+        dEdt[i] = 0;
+        for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            dSqr = pow(x[i] - x[iP], 2)
+                        + pow(y[i] - y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            fij = 1 - 1 / m[iP]
+                    * kernelSize / (omega[i] * DIM) * drho[i]
+                        / (1 + kernelSize /(omega[i] * DIM) * dn[i]);
+            //fij = 1;
+            dEdt[i]  += m[iP]
+                        * ((vx[i]-vx[iP])
+                        * (x[i]-x[iP])
+                        + (vy[i]-vy[iP])
+                        * (y[i]-y[iP])
+#if DIM == 3
+                        + (vz[i]-vz[iP])*(z[i]-z[iP])
+#endif
+                        ) / r * P[i]/pow(rho[i],2)*fij*Kernel::dWdr(r, kernelSize)
+                        ;
+        }
+        // std::cout << "For i = " << i <<", fij is " << fij << std::endl;
+        for (int k = 0; k < noiGhosts[i]; k++){
+            iP = nnlGhosts[k+i*MAX_NUM_GHOST_INTERACTIONS];
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+            + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+
+            fij = 1 - 1 / m[ghostParticles.parent[iP]]
+                    * kernelSize / omega[i] / DIM * drho[i] / (1 + kernelSize /omega[i] / DIM * dn[i]);
+            //fij = 1;
+            dEdt[i]  += m[ghostParticles.parent[iP]]
+                        * ((vx[i]-ghostParticles.vx[iP])* (x[i]-ghostParticles.x[iP])
+                        + (vy[i]-ghostParticles.vy[iP]) * (y[i]-ghostParticles.y[iP])
+#if DIM == 3
+                        + (vz[i]-vz[nnl[k+i*MAX_NUM_GHOST_INTERACTIONS]])*(z[i]-z[nnl[k+i*MAX_NUM_GHOST_INTERACTIONS]])
+#endif
+                        ) / r * P[i]/pow(rho[i],2)*fij*Kernel::dWdr(r, kernelSize)
+                    ;
+        }
+        //std::cout << "dE for i=" << i << " is " << dEdt[i] << std::endl;
+    }
+}
+
+#endif
+
+#if ARTVISC
+// Artificial Viscocity!
+// Compute cs
+void Particles::compCs(const double gamma){
+    for (int i = 0; i < N; i++){
+        cs[i] = sqrt((gamma - 1) * u[i]);
+    }
+}
+
+// Compute Mu_ij
+double Particles::compMuij(int i, int j, const double &kernelSize){
+    double numerator;
+    numerator = ((vx[i] - vx[j]) * (x[i] - x[j])
+            + (vy[i] - vy[j]) * (y[i] - y[j]));
+#if DIM == 3
+    numerator += (vz[i] - vz[j]) * (z[i] - z[j]);
+#endif
+
+    double rSqr;
+    rSqr = pow(x[i] - x[j], 2) + pow(y[i] - y[j], 2);
+#if DIM == 3
+    rSqr += pow(z[i] - z[j], 2);
+#endif
+
+    return kernelSize * numerator / (sqrt(rSqr) + EPSMU * pow(kernelSize, 2));
+}
+
+// Compute PI_ij:
+double Particles::compPIij(int i, int j, const double alpha, const double beta, const double &kernelSize){
+    double numerator;
+    numerator = ((vx[i] - vx[j]) * (x[i] - x[j])
+    + (vy[i] - vy[j]) * (y[i] - y[j]));
+    #if DIM == 3
+    numerator += (vz[i] - vz[j]) * (z[i] - z[j]);
+    #endif
+
+    if (numerator < 0){
+        return 0;
+    }
+    else{
+        double Muij = compMuij(i, j, kernelSize);
+
+        double cij = (cs[i] + cs[j])/2;
+        double rhoij = (rho[i] + rho[j]) / 2;
+
+        return (- alpha * cij * Muij + beta * pow(Muij, 2)) / rhoij;
+    }
+}
+
+// Compute additional acceleration term for artificial viscocity
+void Particles::compAccArtVisc(const double &kernelSize){
+    double PIij, dSqr, r;
+    // Interaction partner:
+    int iP;
+    for (int i = 0; i < N; i++){
+        axArtVisc[i] = 0;
+        ayArtVisc[i] = 0;
+        #if DIM == 3
+        azArtVisc[i] = 0;
+        #endif
+        for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+
+            dSqr = pow(x[i] - x[iP], 2)
+            + pow(y[i] - y[iP], 2);
+            #if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+            #endif
+            r = sqrt(dSqr);
+            PIij = compPIij(i, iP, 1, 2, kernelSize);
+            //Logger(DEBUG) << "PIij is " << PIij;
+            axArtVisc[i] -= m[iP] * PIij * (x[i] - x[iP]) / r *  Kernel::dWdr(r, kernelSize);
+            axArtVisc[i] -= m[iP] * PIij * (y[i] - y[iP]) / r *  Kernel::dWdr(r, kernelSize);
+            #if DIM == 3
+            azArtVisc[i] -= m[iP] * PIij * (z[i] - z[iP]) / r *  Kernel::dWdr(r, kernelSize);
+            #endif
+        }
+    }
+}
+
+// Compute additional energy terms for artificial viscocity
+void Particles::compUiArtVisc(const double &kernelSize){
+    double PIij, dSqr, r;
+    // Interaction partner:
+    int iP;
+    for (int i = 0; i < N; i++){
+        dudtArtVisc[i] = 0;
+        for (int j = 0; j < noi[i]; j++){
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+
+            dSqr = pow(x[i] - x[iP], 2)
+            + pow(y[i] - y[iP], 2);
+            #if DIM == 3
+            dSqr += pow(z[i] - z[iP], 2);
+            #endif
+            r = sqrt(dSqr);
+            if (r <= 0){
+                Logger(DEBUG) << "DANGER";
+            }
+            PIij = compPIij(i, iP, 1, 2, kernelSize);
+            dudtArtVisc[i] += .5 * m[iP] * PIij *  Kernel::dWdr(r, kernelSize)
+            * ((vx[i] - vx[iP]) * (x[i] - x[iP])
+            + (vy[i] - vy[iP]) * (y[i] - y[iP])
+            #if DIM == 3
+            + (vz[i] - vy[iP]) * (z[i] - z[iP])
+            #endif
+        ) / r;
+    }
+}
+}
+
+#if PERIODIC_BOUNDARIES
+// Compute Mu_ij
+double Particles::compMuij(const Particles &ghostParticles, int i, int j, const double &kernelSize){
+    double numerator;
+    numerator = ((vx[i] - ghostParticles.vx[j]) * (x[i] - ghostParticles.x[j])
+            + (vy[i] - ghostParticles.vy[j]) * (y[i] - ghostParticles.y[j]));
+#if DIM == 3
+    numerator += (vz[i] - ghostParticles.vz[j]) * (z[i] - ghostParticles.z[j]);
+#endif
+
+    double rSqr;
+    rSqr = pow(x[i] - ghostParticles.x[j], 2) + pow(y[i] - ghostParticles.y[j], 2);
+#if DIM == 3
+    rSqr += pow(z[i] - ghostParticles.z[j], 2);
+#endif
+    return (kernelSize * numerator / (sqrt(rSqr) + 0.000025 * pow(kernelSize, 2)));
+}
+
+
+// Compute PI_ij:
+double Particles::compPIij(const Particles &ghostParticles, int i, int j, const double alpha, const double beta, const double &kernelSize){
+    double numerator;
+    numerator = ((vx[i] - ghostParticles.vx[j]) * (x[i] - ghostParticles.x[j])
+            + (vy[i] - ghostParticles.vy[j]) * (y[i] - ghostParticles.y[j]));
+#if DIM == 3
+    numerator += (vz[i] - ghostParticles.vz[j]) * (z[i] - ghostParticles.z[j]);
+#endif
+
+    if (numerator < 0){
+        return 0;
+    }
+    else{
+        double Muij = compMuij(ghostParticles, i, j, kernelSize);
+
+        double cij = (cs[i] + cs[ghostParticles.parent[j]])/2;
+        double rhoij = (rho[i] + ghostParticles.rho[j]) / 2;
+
+        return (- alpha * cij * Muij + beta * pow(Muij, 2)) / rhoij;
+    }
+}
+
+// Compute additional acceleration term for artificial viscocity w/ periodic boundaries
+void Particles::compAccArtVisc(const Particles &ghostParticles, const double &kernelSize){
+    double PIij, dSqr, r;
+    // Interaction partner:
+    int iP;
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < noiGhosts[i]; j++){
+            iP = nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS];
+
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+                        + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            PIij = compPIij(ghostParticles, i, iP, 1, 2, kernelSize);
+            //Logger(DEBUG) << "	> PIij ghost is " << PIij;
+            axArtVisc[i] -= m[ghostParticles.parent[iP]] * PIij * (x[i] - ghostParticles.x[iP]) / r *  Kernel::dWdr(r, kernelSize);
+            axArtVisc[i] -= m[ghostParticles.parent[iP]] * PIij * (y[i] - ghostParticles.y[iP]) / r *  Kernel::dWdr(r, kernelSize);
+#if DIM == 3
+            azArtVisc[i] -= m[ghostParticles.parent[iP]] * PIij * (z[i] - ghostParticles.z[iP]) / r *  Kernel::dWdr(r, kernelSize);
+#endif
+        }
+    }
+}
+
+
+
+// Compute additional energy terms for artificial viscocity
+void Particles::compUiArtVisc(const Particles &ghostParticles, const double &kernelSize){
+    double PIij, dSqr, r;
+    // Interaction partner:
+    int iP;
+    for (int i = 0; i < N; i++){
+        for (int j = 0; j < noiGhosts[i]; j++){
+            iP = nnlGhosts[j+i*MAX_NUM_GHOST_INTERACTIONS];
+
+            dSqr = pow(x[i] - ghostParticles.x[iP], 2)
+                        + pow(y[i] - ghostParticles.y[iP], 2);
+#if DIM == 3
+            dSqr += pow(z[i] - ghostParticles.z[iP], 2);
+#endif
+            r = sqrt(dSqr);
+            PIij = compPIij(ghostParticles, i, iP, 1, 2, kernelSize);
+            dudtArtVisc[i] += .5 * m[ghostParticles.parent[iP]] * PIij *  Kernel::dWdr(r, kernelSize)
+                * ((vx[i] - ghostParticles.vx[iP]) * (x[i] - ghostParticles.x[iP])
+                    + (vy[i] - ghostParticles.vy[iP]) * (y[i] - ghostParticles.y[iP])
+#if DIM == 3
+                    + (vz[i] - ghostParticles.vy[iP]) * (z[i] - ghostParticles.z[iP])
+#endif
+                ) / r;
+        }
+    }
+}
+
+#endif
+
+#endif
+#endif
+// Calculate acceleration for each particle, w/o Ghosts
+// c.f. eq 8 in Monaghan: SPH and its diverse Applications, Annu.Rev. Fluid mechanics, 2012
+
+
+// void Particles::printDensity(const double &gamma){
+//     for (int i = 0; i < N; i += 25){
+//         Logger(DEBUG) << "i=" << i << ":rho= " << rho[i] << ", u= " << u[i] << "< p= " << P[i] << "test=" << rho[i]*u[i]*(1 - gamma);
+//     }
+// }
+
+
+
+
+// Todo: Remove
+// Implementing equation F2 in Hopkins` GIZMO Paper
+// Storing v_i*dP_i/dt in the variable unimportant, so that only a scalar is needed
+// void Particles::calcdP(const Particles &ghostParticles, const double &kernelSize){
+//     int iP;
+//     double dSqr, r, fij, fji, summand;
+//     for (int i = 0; i < N; i++){
+//         unimportant[i] = 0;
+//         for (int j = 0; j < noi[i]; j++){
+//             dSqr = pow((x[i] - x[iP]), 2)
+//                         + pow((y[i] - y[iP]), 2);
+// #if DIM == 3
+//             dSqr += pow(z[i] - z[iP], 2);
+// #endif
+//             r = sqrt(dSqr);
+//
+//             fij = 1 - 1 / m[iP]
+//                     * kernelSize /omega[i] / DIM * drho[i]
+//                     / (1 + kernelSize /omega[i] / DIM * dn[i]);
+//
+//             summand = m[i]*m[iP] * Kernel::dWdr(r, kernelSize)
+//                     * (P[i]/pow(rho[i], 2)*fij
+//                         +  P[iP]/pow(rho[iP], 2)*fji);
+//
+//
+//             unimportant[i] -= summand * (vx[i]*(x[i]- x[iP]) + vy[i]*(y[i]-y[iP])
+// #if DIM == 3
+//                             + vz[i]*(z[i]- z[iP])
+// #endif
+//                             ) / r;
+//         }
+//         // Ghosts!
+//         for (int k = 0; k < noiGhosts[i]; k++){
+//             dSqr = pow((x[i] - x[nnl[k+i*MAX_NUM_INTERACTIONS]]), 2)
+//                         + pow((y[i] - y[iP]), 2);
+// #if DIM == 3
+//             dSqr += pow(z[i] - z[iP], 2);
+// #endif
+//             r = sqrt(dSqr);
+//
+//             fij = 1 - 1 / m[ghostParticles.parent[iP]]
+//                     * kernelSize /omega[i] / DIM * drho[i]
+//                     / (1 + kernelSize /omega[i] / DIM * dn[i]);
+//
+//             fji = 1 - 1 / m[i]
+//                     * kernelSize / omega[iP] / DIM * drho[iP]
+//                     / ( 1 + kernelSize / omega[iP] / DIM * dn[iP]);
+//
+//             summand = m[i]*m[ghostParticles.parent[iP]] * Kernel::dWdr(r, kernelSize)
+//                     * (P[i]/pow(rho[i], 2)*fij
+//                         +  P[iP]/pow(rho[iP], 2)*fji);
+//
+//
+//             unimportant[i] -= summand * (vx[i]*(x[i]- x[iP]) + vy[i]*(y[i]-y[iP])
+// #if DIM == 3
+//                             + vz[i]*(z[i]- z[iP])
+// #endif
+//                             ) / r;
+//         }
+//     }
+// }
+//
+//
+
+
+// Implementing equation F2 in Hopkins` GIZMO Paper
+// Storing v_i*dP_i/dt in the variable unimportant, so that only a scalar is needed
+// void Particles::calcdP(const double &kernelSize){
+//     double fij, fji, summand;
+//     for (int i = 0; i < N; i++){
+//         unimportant[i] = 0;
+//         for (int j = 0; j < noi[i]; j++){
+//             dSqr = pow((x[i] - x[iP]), 2)
+//                         + pow((y[i] - y[iP]), 2);
+// #if DIM == 3
+//             dSqr += pow(z[i] - z[iP], 2);
+// #endif
+//             r = sqrt(dSqr);
+//
+//             fij = 1 - 1 / m[iP]
+//                     * kernelSize /omega[i] / DIM * drho[i] / (1 + kernelSize /omega[i] / DIM * dn[i]);
+//
+//             fji = 1 - 1 / m[i] * kernelSize / omega[iP]/DIM*drho[iP]
+//                     / ( 1 + kernelSize / omega[iP] / DIM * dn[iP]);
+//
+//             summand = m[i]*m[nnList[j+i*MAX_NUM_INTERACTIONS]] * Kernel::dWdr(kernelSize)
+//                     * (P[i]/pow(rho[i], 2)*fij
+//                         +  P[iP]/pow(rho[iP], 2)*fji);
+//
+//
+//             unimportant[i] += summand * (vx[i]*(x[i]- x[iP]) + vy[i]*(y[i]-y[iP]));
+// #if DIM == 3
+//             unimportant[i] += summand * vz[i]*(z[i]- z[iP]);
+// #endif
+//         }
+//     }
+// }
+
+
 
 void Particles::compDensity(const double &kernelSize){
     for(int i=0; i<N; ++i){
+//#if PERIODIC_BOUNDARIES
         compOmega(i, kernelSize);
         rho[i] = m[i]*omega[i];
         if(rho[i] <= 0.){
             Logger(WARN) << "Zero or negative density @" << i;
+        }
+        if ((i - 0) % 30 == 0){
+            Logger(DEBUG) << "density from ghosts: i = " << i << ", dnst = " << rho[i];
         }
     }
 }
 
 void Particles::compOmega(int i, const double &kernelSize){
     double omg = 0.;
+    int iP;
     for (int j=0; j<noi[i]; ++j){
-        double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
-                    + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+        iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+        double dSqr = pow(x[i] - x[iP], 2)
+                    + pow(y[i] - y[iP], 2);
 #if DIM == 3
-        dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+        dSqr += pow(z[i] - z[iP], 2);
 #endif
         double r = sqrt(dSqr);
         omg += kernel(r, kernelSize);
 
         //Logger(DEBUG) << "x[" << i << "] = [" << x[i] << ", " <<  y[i] << "], x["
-        //          << nnl[j+i*MAX_NUM_INTERACTIONS] << "] = [" << x[nnl[j+i*MAX_NUM_INTERACTIONS]] << ", "
-        //          << y[nnl[j+i*MAX_NUM_INTERACTIONS]] << "]";
+        //          << iP << "] = [" << x[iP] << ", "
+        //          << y[iP] << "]";
 
     }
     omega[i] = omg + kernel(0., kernelSize); // add self interaction to normalization factor
 }
 
 void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
+    int iP;
     for (int i=0; i<N; ++i){
 
         // reset buffer
@@ -259,19 +1119,19 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
 #endif
 
         for (int j=0; j<noi[i]; ++j){
-
-            double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
-                          + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            double dSqr = pow(x[i] - x[iP], 2)
+                          + pow(y[i] - y[iP], 2);
 #if DIM == 3
-            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            dSqr += pow(z[i] - z[iP], 2);
 #endif
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize)/omega[i];
 
-            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
-            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[0] = x[iP];
+            xj[1] = y[iP];
 #if DIM==3
-            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[2] = z[iP];
 #endif
 
             for (int alpha=0; alpha<DIM; ++alpha){
@@ -284,17 +1144,17 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
         helper.inverseMatrix(B, DIM);
 
         for (int j=0; j<noi[i]; ++j) {
-
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
             double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
                           + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
 #if DIM == 3
-            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            dSqr += pow(z[i] - z[iP], 2);
 #endif
             double r = sqrt(dSqr);
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
-            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
-            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[0] = x[iP];
+            xj[1] = y[iP];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 psijTilde_xi[j + i * MAX_NUM_INTERACTIONS][alpha] = 0.;
@@ -305,6 +1165,7 @@ void Particles::compPsijTilde(Helper &helper, const double &kernelSize){
         }
     }
 }
+
 
 void Particles::gradient(double *f, double (*grad)[DIM]){
     for (int i=0; i<N; ++i) {
@@ -323,7 +1184,11 @@ void Particles::gradient(double *f, double (*grad)[DIM]){
 
 void Particles::compPressure(const double &gamma){
     for (int i=0; i<N; ++i){
+        // if (i % 1 == 0){
+        //     Logger(DEBUG) << "Paricle " << i << " has density " << rho[i] << " and u[i] " << u[i];
+        // }
         P[i] = (gamma-1.)*rho[i]*u[i];
+        // std::cout << P[i] << std::endl;
 //#if DIM == 3
 //        P[i] = (gamma-1.)*rho[i]*(u[i]+.5*(vx[i]*vx[i]+vy[i]*vy[i]+vz[i]*vz[i]));
 //#else
@@ -902,7 +1767,7 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         x[i] += .5*(vx[i]+vxi)*dt;
         y[i] += .5*(vy[i]+vyi)*dt;
         //x[i] += vxi*dt;
-        //y[i] += vyi*dt;
+        //y[i] += vyi*dt;<
 #if DIM==3
         z[i] += .5*(vz[i]+vzi)*dt;
 #endif
@@ -1078,6 +1943,7 @@ void Particles::ghostNNS(Domain &domain, const Particles &ghostParticles, const 
         noiGhosts[i] = noiBuf;
     }
 }
+#endif
 
 void Particles::compDensity(const Particles &ghostParticles, const double &kernelSize){
     for(int i=0; i<N; ++i){
@@ -1110,6 +1976,7 @@ void Particles::compOmega(int i, const Particles &ghostParticles, const double &
 }
 
 void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, const double &kernelSize){
+    int iP;
     for (int i=0; i<N; ++i){
 
         // reset buffer
@@ -1131,20 +1998,20 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
         //        << ", noiGhosts[" << i << "] = " << noiGhosts[i];
 
         for (int j=0; j<noi[i]; ++j){
-
-            double dSqr = pow(x[i] - x[nnl[j+i*MAX_NUM_INTERACTIONS]], 2)
-                          + pow(y[i] - y[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
+            double dSqr = pow(x[i] - x[iP], 2)
+                          + pow(y[i] - y[iP], 2);
 #if DIM == 3
-            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            dSqr += pow(z[i] - z[iP], 2);
 #endif
             double r = sqrt(dSqr);
             //double psij_xi = kernel(r, kernelSize)/omega[nnl[j + i * MAX_NUM_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize)/omega[i];
 
-            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
-            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[0] = x[iP];
+            xj[1] = y[iP];
 #if DIM==3
-            xj[2] = z[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[2] = z[iP];
 #endif
 
             //if (i == 7){
@@ -1217,18 +2084,18 @@ void Particles::compPsijTilde(Helper &helper, const Particles &ghostParticles, c
         //exit(7);
 
         for (int j=0; j<noi[i]; ++j) {
-
+            iP = nnl[j+i*MAX_NUM_INTERACTIONS];
             double dSqr = pow(x[i] - x[nnl[j + i * MAX_NUM_INTERACTIONS]], 2)
                           + pow(y[i] - y[nnl[j + i * MAX_NUM_INTERACTIONS]], 2);
 #if DIM == 3
-            dSqr += pow(z[i] - z[nnl[j+i*MAX_NUM_INTERACTIONS]], 2);
+            dSqr += pow(z[i] - z[iP], 2);
 #endif
             double r = sqrt(dSqr);
             //double psij_xi = kernel(r, kernelSize) / omega[nnl[j + i * MAX_NUM_INTERACTIONS]];
             double psij_xi = kernel(r, kernelSize) / omega[i];
 
-            xj[0] = x[nnl[j+i*MAX_NUM_INTERACTIONS]];
-            xj[1] = y[nnl[j+i*MAX_NUM_INTERACTIONS]];
+            xj[0] = x[iP];
+            xj[1] = y[iP];
 
             for (int alpha = 0; alpha < DIM; ++alpha) {
                 //psijTilde_xi[nnl[j + i * MAX_NUM_INTERACTIONS]+i*MAX_NUM_INTERACTIONS][alpha] = 0.;
@@ -1600,7 +2467,6 @@ void Particles::dumpNNL(std::string filename, const Particles &ghostParticles){
     }
 }
 
-#endif
 
 // TODO: remove below
 /*void Particles::move(const double &dt, Domain &domain){
@@ -1664,6 +2530,7 @@ double Particles::sumEnergy(){
     for (int i=0; i<N; ++i){
         E += m[i]*(u[i] + .5*(vx[i]*vx[i]+vy[i]*vy[i]));
     }
+    std::cout << "E is " <<  E << std::endl;
     return E;
 }
 
@@ -1836,4 +2703,3 @@ void Particles::dump2file(std::string filename){
     velDataSet.write(velVec);
     rhoGradDataSet.write(rhoGradVec);
 }
-

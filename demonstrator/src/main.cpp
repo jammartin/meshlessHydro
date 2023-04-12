@@ -8,13 +8,15 @@
 #include "../include/Logger.h"
 #include "../include/ConfigParser.h"
 #include "../include/MeshlessScheme.h"
+#include "../include/SPH.h"
+
 
 structlog LOGCFG = {};
 
 int main(int argc, char *argv[]){
 
     cxxopts::Options cmdLineOptions { "mlh",
-                                      "Demonstrator for the meshless hydrodynamic simulation methods MFV and MFM" };
+                                      "Demonstrator for the meshless hydrodynamic simulation methods MFV and MFM. Also does SPH with smoothed gradient" };
     cmdLineOptions.add_options()
             ("c,config", "Path to config file", cxxopts::value<std::string>()->default_value("config.info"))
             ("v,verbose", "More printouts for debugging")
@@ -42,8 +44,13 @@ int main(int argc, char *argv[]){
         }
     }
 
+
     Logger(INFO) << "Reading configuration ... ";
+#if RUNSPH
+    SPH::Configuration config;
+#else
     MeshlessScheme::Configuration config;
+#endif
 
     config.initFile = confP.getVal<std::string>("initFile");
     Logger(INFO) << "    > Initial distribution: " << config.initFile;
@@ -91,7 +98,14 @@ int main(int argc, char *argv[]){
 
     double *domainLimits = config.periodicBoxLimits;
     Domain::Cell boundingBox { domainLimits };
+
+
+#if RUNSPH
+    SPH algorithm {config, &particles, boundingBox};
+#else
+
     MeshlessScheme algorithm { config, &particles, boundingBox };
+#endif
 
     Logger(INFO) << "... done.";
 
