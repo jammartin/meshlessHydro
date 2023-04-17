@@ -36,7 +36,7 @@
 #define PSI_2 .25           // TODO: move to config
 
 /// meshless finite mass method instead of meshless finite volume
-#define MESHLESS_FINITE_MASS 1
+#define MESHLESS_FINITE_MASS 0
 
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
@@ -47,7 +47,7 @@
 /** define debug level to enable additional output:
  * 0: no debug additions
  * 1: additional checks
- * 2: dump NNL and ghosts to files
+ * 2: dump NNL and ghosts to files (this should not be used for large amounts of particles)
 **/
 #define DEBUG_LVL 1
 
@@ -55,7 +55,7 @@
 #define FIRST_ORDER_QUAD_POINT 1
 
 /// define if code should run as SPH, which ignores most of the directives above
-#define RUNSPH 0
+#define RUNSPH 1
 
 /// define if arificial viscosity should be employed
 #define ARTVISC 1
@@ -68,7 +68,6 @@
 /// define verbosity for each VERBOSITY_PARTICLES particles
 // TODO: use this flag when debug level 1
 #define VERBOSITY_PARTICLES 10
-
 
 /// deprecated, ENFORCE_FLUX_SYM should be set to 1
 // define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry

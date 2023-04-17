@@ -52,17 +52,17 @@ void SPH::run(){
 #else
         particles->compDensitySPH(config.kernelSize);
 #endif
-#if PERIODIC_BOUNDARIES
-        particles->updateGhostState(ghostParticles);
-#endif
+//#if PERIODIC_BOUNDARIES
+//        particles->updateGhostState(ghostParticles);
+//#endif
 
-        if (step == 0){
-            Logger(INFO) << "   > Setting u so that P = 2.5";
-            particles->setInternalEnergy(2.5, config.gamma);
-#if PERIODIC_BOUNDARIES
-            particles->updateGhostState(ghostParticles);
-#endif
-        }
+    //    if (step == 0){
+            //Logger(INFO) << "   > Setting u so that P = 2.5";
+            //particles->setInternalEnergy(2.5, config.gamma);
+//#if PERIODIC_BOUNDARIES
+            //particles->updateGhostState(ghostParticles);
+//#endif
+  //      }
         Logger(INFO) << "    > Computing pressure";
         particles->compPressure(config.gamma);
         // //particles->printDensity(config.gamma);
@@ -87,20 +87,37 @@ void SPH::run(){
 
 
 #if ARTVISC
-    Logger(INFO) << "   > Computing speed of sound";
-    particles->compCs(config.gamma);
-            // Logger(INFO) << "   > Computing artificial viscocity for acceleration";
-            // particles->compAccArtVisc(config.kernelSize);
-    // #if PERIODIC_BOUNDARIES
-    //         particles->compAccArtVisc(ghostParticles, config.kernelSize);
-    // #endif
+        Logger(INFO) << "   > Computing speed of sound";
+        particles->compCs(config.gamma);
+        // Logger(INFO) << "   > Computing artificial viscocity for acceleration";
+        // particles->compAccArtVisc(config.kernelSize);
+        // #if PERIODIC_BOUNDARIES
+        //         particles->compAccArtVisc(ghostParticles, config.kernelSize);
+        // #endif
 #endif
 
+        if (step % config.h5DumpInterval == 0) {
+            std::stringstream stepss;
+            Logger(INFO) << "   > Dump particle distribution";
+            stepss << std::setw(6) << std::setfill('0') << step;
+            Logger(INFO) << "      > Dump particles to file";
+            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"), t);
+
+#if DEBUG_LVL > 1
+            #if PERIODIC_BOUNDARIES
+            Logger(INFO) << "      > Dump ghosts to file";
+            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"), t);
+            Logger(INFO) << "      > Dump NNL to file";
+            particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
+#endif // PERIODIC_BOUNDARIES
+#endif // DEBUG_LVL > 1
+        }
+
 #if PERIODIC_BOUNDARIES
-    Logger(DEBUG) << "	> Computing acceleration";
-    particles->compAccSPH(ghostParticles, config.kernelSize);
+        Logger(DEBUG) << "	> Computing acceleration";
+        particles->compAccSPH(ghostParticles, config.kernelSize);
 #else
-    Logger(DEBUG) << "	> Computing acceleration";
+        Logger(DEBUG) << "	> Computing acceleration";
     particles->compAccSPH(config.kernelSize);
 #endif
 
@@ -108,19 +125,13 @@ void SPH::run(){
         particles->updateGhostState(ghostParticles);
 #endif
 
-//#if SLOPE_LIMITING
-//        // TODO: check how to properly limit gradiens
-//        Logger(DEBUG) << "      > Limiting slopes";
-//        particles->slopeLimiter(config.kernelSize);
-//#endif
-
         Logger(INFO) << "    > Euler integration";
 
-        Logger(DEBUG) << "      > Old Energy:" << particles->sumEnergy();
+        //Logger(DEBUG) << "      > Old Energy:" << particles->sumEnergy();
 
         particles->eulerSPH(config.timeStep, domain);
 
-        Logger(DEBUG) << "      > New Energy; " << particles->sumEnergy();
+        //Logger(DEBUG) << "      > New Energy; " << particles->sumEnergy();
 
          // ENERGY
          Logger(DEBUG) << " 	> Computing omega w/o ghost particcles:";
@@ -161,23 +172,6 @@ void SPH::run(){
 // // #if PERIODIC_BOUNDARIES
 // //         particles->updateGhostState(ghostParticles);
 // // #endif
-
-        if (step % config.h5DumpInterval == 0) {
-            std::stringstream stepss;
-            Logger(INFO) << "   > Dump particle distribution";
-            stepss << std::setw(6) << std::setfill('0') << step;
-            Logger(INFO) << "      > Dump particles to file";
-            particles->dump2file(config.outDir + "/" + stepss.str() + std::string(".h5"), t);
-
-#if DEBUG_LVL > 1
-#if PERIODIC_BOUNDARIES
-            Logger(INFO) << "      > Dump ghosts to file";
-            ghostParticles.dump2file(config.outDir + "/" + stepss.str() + std::string("Ghosts.h5"), t);
-            Logger(INFO) << "      > Dump NNL to file";
-            particles->dumpNNL(config.outDir + "/" + stepss.str() + std::string("NNL.h5"), ghostParticles);
-#endif
-#endif
-        }
 
         if (t>=config.timeEnd){
             Logger(INFO) << "    > t = " << t << " -> FINISHED!";

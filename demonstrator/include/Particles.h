@@ -106,7 +106,7 @@ public:
     double compMuij(int i, int j, const double &kernelSize);
 
     // Compute PI_ij:
-    double compPIij(int i, int j, const double alpha, const double beta, const double &kernelSize);
+    double compPIij(int i, int j, const double &kernelSize);
 
     // Compute additional acceleration term for artificial viscocity
     void compAccArtVisc(const double &kernelSize);
@@ -121,7 +121,7 @@ public:
     double compMuij(const Particles &ghostParticles, int i, int j, const double &kernelSize);
 
     // Compute PI_ij for a ghost Particle as an interaction partner:
-    double compPIij(const Particles &ghostParticles, int i, int j, const double alpha, const double beta, const double &kernelSize);
+    double compPIij(const Particles &ghostParticles, int i, int j, const double &kernelSize);
 
     // Compute additional acceleration term for artificial viscocity w/ ghostPartices
     void compAccArtVisc(const Particles &ghostParticles, const double &kernelSize);

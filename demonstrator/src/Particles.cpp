@@ -423,7 +423,7 @@ void Particles::compAccSPH(const double &kernelSize){
             r = sqrt(dSqr);
             PRhoTarget =  P[j] / pow(rho[j], 2);
             #if ARTVISC
-            PIij = compPIij(i, iP, ALPHA_VISC, BETA_VISC, kernelSize);
+            PIij = compPIij(i, iP, kernelSize);
             ax[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
             ay[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
 
@@ -456,23 +456,17 @@ void Particles::compAccSPH(const double &kernelSize){
 
 // Euler intgration for SPH
 void Particles::eulerSPH(const double &dt, const Domain &domain){
-    double scale = 1;
-    double vyTmp;
     for (int i = 0; i < N; i++){
-        vyTmp = x[i];
         vx[i] += ax[i]*dt;
         vy[i] += ay[i]*dt;
 #if DIM == 3
         vz[i] += dt * az[i];
 #endif
 
-        // if (i % 100 == 0){
-        //     Logger(DEBUG) << "dvx is " << vy[i] - vyTmp;
-        // }
         x[i] += vx[i]*dt;
         y[i] += vy[i]*dt;
 #if DIM == 3
-        z[i] += az[i]*dt*dt;
+        z[i] += vz[i]*dt;
 #endif
 
 #if PERIODIC_BOUNDARIES
@@ -623,6 +617,7 @@ void Particles::compDensitySPH(const Particles &ghostParticles, const double &ke
             dSqr += pow(z[i] - ghostParticles.z[iP], 2);
 #endif
             r = sqrt(dSqr);
+            // TODO: include mass in update ghost state
             dnst += m[ghostParticles.parent[iP]] * kernel(r, kernelSize);
             //Logger(DEBUG) << "k = " << k << " mass:  " << m[ghostParticles.parent[iP]] << " W: " << kernel(r,kernelSize);
         }
@@ -662,7 +657,7 @@ void Particles::compAccSPH(const Particles &ghostParticles, const double &kernel
             r = sqrt(dSqr);
             PRhoTarget =  P[iP] / pow(rho[iP], 2);
 #if ARTVISC
-            PIij = compPIij(i, iP, 1.5, 3, kernelSize); // TODO: what is 1.5 and 3. ???
+            PIij = compPIij(i, iP, kernelSize); // TODO: what is 1.5 and 3. ???
             ax[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (x[iP] - x[i])/r * Kernel::dWdr(r, kernelSize);
             ay[i] += m[iP] * (PRhoHost + PRhoTarget + PIij)  * (y[iP] - y[i])/r * Kernel::dWdr(r, kernelSize);
 
@@ -697,7 +692,7 @@ void Particles::compAccSPH(const Particles &ghostParticles, const double &kernel
             PRhoTarget = ghostParticles.P[iP]
                 / pow(ghostParticles.rho[iP], 2);
 #if ArtVisc
-            PIij = compPIij(ghostParticles, i, iP, 1.5, 3, kernelSize);
+            PIij = compPIij(ghostParticles, i, iP, kernelSize);
             ax[i] -= m[ghostParticles.parent[iP]]*(PRhoHost+PRhoTarget+PIij)
                 * (x[i] - ghostParticles.x[iP])
                     / r * Kernel::dWdr(r, kernelSize);
@@ -857,7 +852,7 @@ double Particles::compMuij(int i, int j, const double &kernelSize){
 }
 
 // Compute PI_ij:
-double Particles::compPIij(int i, int j, const double alpha, const double beta, const double &kernelSize){
+double Particles::compPIij(int i, int j, const double &kernelSize){
     double numerator;
     numerator = ((vx[i] - vx[j]) * (x[i] - x[j])
     + (vy[i] - vy[j]) * (y[i] - y[j]));
@@ -874,7 +869,7 @@ double Particles::compPIij(int i, int j, const double alpha, const double beta, 
         double cij = (cs[i] + cs[j])/2;
         double rhoij = (rho[i] + rho[j]) / 2;
 
-        return (- alpha * cij * Muij + beta * pow(Muij, 2)) / rhoij;
+        return (- ALPHA_VISC * cij * Muij + BETA_VISC * pow(Muij, 2)) / rhoij;
     }
 }
 
@@ -898,7 +893,7 @@ void Particles::compAccArtVisc(const double &kernelSize){
             dSqr += pow(z[i] - z[iP], 2);
             #endif
             r = sqrt(dSqr);
-            PIij = compPIij(i, iP, 1, 2, kernelSize);
+            PIij = compPIij(i, iP, kernelSize);
             //Logger(DEBUG) << "PIij is " << PIij;
             axArtVisc[i] -= m[iP] * PIij * (x[i] - x[iP]) / r *  Kernel::dWdr(r, kernelSize);
             axArtVisc[i] -= m[iP] * PIij * (y[i] - y[iP]) / r *  Kernel::dWdr(r, kernelSize);
@@ -928,7 +923,7 @@ void Particles::compUiArtVisc(const double &kernelSize){
             if (r <= 0){
                 Logger(DEBUG) << "DANGER";
             }
-            PIij = compPIij(i, iP, 1, 2, kernelSize);
+            PIij = compPIij(i, iP, kernelSize);
             dudtArtVisc[i] += .5 * m[iP] * PIij *  Kernel::dWdr(r, kernelSize)
             * ((vx[i] - vx[iP]) * (x[i] - x[iP])
             + (vy[i] - vy[iP]) * (y[i] - y[iP])
@@ -960,7 +955,7 @@ double Particles::compMuij(const Particles &ghostParticles, int i, int j, const 
 
 
 // Compute PI_ij:
-double Particles::compPIij(const Particles &ghostParticles, int i, int j, const double alpha, const double beta, const double &kernelSize){
+double Particles::compPIij(const Particles &ghostParticles, int i, int j, const double &kernelSize){
     double numerator;
     numerator = ((vx[i] - ghostParticles.vx[j]) * (x[i] - ghostParticles.x[j])
             + (vy[i] - ghostParticles.vy[j]) * (y[i] - ghostParticles.y[j]));
@@ -977,7 +972,7 @@ double Particles::compPIij(const Particles &ghostParticles, int i, int j, const 
         double cij = (cs[i] + cs[ghostParticles.parent[j]])/2;
         double rhoij = (rho[i] + ghostParticles.rho[j]) / 2;
 
-        return (- alpha * cij * Muij + beta * pow(Muij, 2)) / rhoij;
+        return (- ALPHA_VISC * cij * Muij + BETA_VISC * pow(Muij, 2)) / rhoij;
     }
 }
 
@@ -996,7 +991,7 @@ void Particles::compAccArtVisc(const Particles &ghostParticles, const double &ke
             dSqr += pow(z[i] - ghostParticles.z[iP], 2);
 #endif
             r = sqrt(dSqr);
-            PIij = compPIij(ghostParticles, i, iP, 1, 2, kernelSize);
+            PIij = compPIij(ghostParticles, i, iP, kernelSize);
             //Logger(DEBUG) << "	> PIij ghost is " << PIij;
             axArtVisc[i] -= m[ghostParticles.parent[iP]] * PIij * (x[i] - ghostParticles.x[iP]) / r *  Kernel::dWdr(r, kernelSize);
             axArtVisc[i] -= m[ghostParticles.parent[iP]] * PIij * (y[i] - ghostParticles.y[iP]) / r *  Kernel::dWdr(r, kernelSize);
@@ -1024,7 +1019,7 @@ void Particles::compUiArtVisc(const Particles &ghostParticles, const double &ker
             dSqr += pow(z[i] - ghostParticles.z[iP], 2);
 #endif
             r = sqrt(dSqr);
-            PIij = compPIij(ghostParticles, i, iP, 1, 2, kernelSize);
+            PIij = compPIij(ghostParticles, i, iP, kernelSize);
             dudtArtVisc[i] += .5 * m[ghostParticles.parent[iP]] * PIij *  Kernel::dWdr(r, kernelSize)
                 * ((vx[i] - ghostParticles.vx[iP]) * (x[i] - ghostParticles.x[iP])
                     + (vy[i] - ghostParticles.vy[iP]) * (y[i] - ghostParticles.y[iP])
@@ -2043,7 +2038,9 @@ void Particles::updateStateAndPosition(const double &dt, const Domain &domain){
         //}
 
         // UPDATE MASS
+#if !MESHLESS_FINITE_MASS
         m[i] -= dt*mF[i];
+#endif
         if (m[i] <= 0.){
             Logger(ERROR) << "Negative mass. m[" << i << "] =" << m[i] << ", mF = " << mF[i];
             //m[i] = MASS_FLOOR;
