@@ -76,6 +76,9 @@ if __name__=="__main__":
     cmap_b = mplc.LinearSegmentedColormap.from_list('b_cmap',[c_white_trans,c_blue],512)
     cmap_g = mplc.LinearSegmentedColormap.from_list('g_cmap',[c_white_trans,c_green],512)
 
+    plt.rc('text', usetex=True)
+    plt.rcParams.update({'font.size': 18})
+    
     plt.figure(figsize=(6,6), dpi=200)
     
     # plot real cells
@@ -91,8 +94,10 @@ if __name__=="__main__":
     # plot particles
     plt.plot(pos[:, 0], pos[:, 1], 'kx')
 
-    plt.xlabel("x")
-    plt.ylabel("y")
+    plt.xlabel("$x$")
+    plt.ylabel("$y$")
+
+    plt.gcf().get_axes()[0].set_aspect('equal')
     
     #plt.show()
     plt.tight_layout()
