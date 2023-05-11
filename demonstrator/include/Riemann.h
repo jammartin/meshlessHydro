@@ -25,6 +25,13 @@ public:
      */
     void exact(double *Fij, const double &gamma);
 
+    // HLL approximate Riemann solver, as in Toro, chapter 10.3
+    // For != ideal gas
+    // void HLL();
+
+    // Add HLLC function for approximate Riemann Solver
+    void HLLC(double *Fij);
+
 private:
     int i;
     double *WR, *WL, *vFrame, *Aij;

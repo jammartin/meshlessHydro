@@ -4,8 +4,17 @@
 
 #include "../include/Riemann.h"
 
-Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i) :
-                    WR { WR }, WL { WL }, vFrame { vFrame },  Aij { Aij }, i { i }{
+Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij,
+#if USE_HLLC
+                                                        double *n_unit,
+#endif
+                                                                int i) :
+
+                    WR { WR }, WL { WL }, vFrame { vFrame },  Aij { Aij },
+#if USE_HLLC
+                                                        n_unit {n_unit},
+#endif
+                                                                i { i }{
 
     // compute norm of effective face
     double AijNorm = sqrt(Helper::dotProduct(Aij, Aij));
@@ -80,6 +89,22 @@ Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i) :
 #endif
 }
 
+
+// Add HLLC function for approximate Riemann Solver
+void HLLC(double *Fij, const double &gamma){
+
+
+    HLLC:solve(WL, WR, n_unit, vij, Fij);
+
+// Rotate and prpject fluxes onto Aij
+#if DIM==3
+        rotateAndProjectFluxes3D(Fij, gamma);
+#else
+        rotateAndProjectFluxes2D(Fij, gamma);
+#endif
+}
+
+// Exact Riemann solver
 void Riemann::exact(double *Fij, const double &gamma){
     RiemannSolver solver { gamma };
 
@@ -228,4 +253,3 @@ void Riemann::rotateAndProjectFluxes3D(double *Fij, const double &gamma){
 
 }
 #endif
-

@@ -81,6 +81,7 @@ Particles::Particles(int numParticles, bool ghosts) : N { numParticles }, ghosts
     vyGrad = new double[numParticles][DIM];
     PGrad = new double[numParticles][DIM];
 
+
 #if RUNSPH
     ax = new double[numParticles];
     ay = new double[numParticles];
@@ -578,7 +579,39 @@ void Particles::calcdE(const double &kernelSize){
     }
 }
 
+// For HLLC solver: Calculate norm vector between two particles:
+// n_unit needs to be pre-allocated
+void calcNunit(const int i, const int j, double* n_unit){
+    double dSqr = pow(x[j] - x[i], 2)
+                        + pow(y[j] - y[i], 2);
+#if DIM == 3
+    dSqr += pow(z[j] - z[i], 2);
+#endif
+    double r = sqrt(dSqr);
+    n_unit[0] = (x[j] - x[i]) / r;
+    n_unit[1] = (y[j] - y[i]) / r;
+#if DIM == 3
+    n_unit[2] = (z[j] - z[i]) / r;
+#endif
+}
+
 #if PERIODIC_BOUNDARIES
+
+// For HLLC solver: Calculate norm vector between two particles, one of which is a ghost:
+// n_unit needs to be pre-allocated
+void calcNunit(const Particles &ghostParticles, const int i, const int j, double* n_unit){
+    double dSqr = pow(ghostParticles.x[j] - x[i], 2)
+                        + pow(ghostParticles.y[j] - y[i], 2);
+#if DIM == 3
+    dSqr += pow(ghostParticles.z[j] - z[i], 2);
+#endif
+    double r = sqrt(dSqr);
+    n_unit[0] = (ghostParticles.x[j] - x[i]) / r;
+    n_unit[1] = (ghostParticles.y[j] - y[i]) / r;
+#if DIM == 3
+    n_unit[2] = (ghostParticles.z[j] - z[i]) / r;
+#endif
+}
 
 // Computes the density via kernel smoothing w/ ghost particles
 void Particles::compDensitySPH(const Particles &ghostParticles, const double &kernelSize){
@@ -1785,6 +1818,9 @@ double Particles::pairwiseLimiter(double phi0, double phi_i, double phi_j, doubl
 }
 
 void Particles::solveRiemannProblems(const double &gamma, const Particles &ghostParticles){
+#if USE_HLLC
+    double n_unit[DIM];
+#endif
     for (int i=0; i<N; ++i){
 
         //if (!(i % (N/VERBOSITY_PARTICLES))){
@@ -1849,8 +1885,14 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
             }
 #endif
             if (compute){
+#if USE_HLLC
+                calcNunit(i, ii, n_unit);
+                Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii], n_unit, i};
+                solver.HLLC(Fij[ii], gamma);
+#else
                 Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii] , i };
                 solver.exact(Fij[ii], gamma);
+#endif
             } else {
                 for(int d=0; d<DIM+2; ++d){
                     Fij[ii][d] = -Fij[iij][d];
@@ -1898,8 +1940,14 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
 #endif
 
             if (compute) {
+#if USE_HLLC
+                calcNunit(i, ii, n_unit);
+                Riemann solver{WijLGhosts[ii], WijRGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], n_unit, i};
+                solver.HLLC(FijGhosts[ii], gamma);
+#else
                 Riemann solver{WijLGhosts[ii], WijRGhosts[ii], vFrameGhosts[ii], AijGhosts[ii], i};
                 solver.exact(FijGhosts[ii], gamma);
+#endif
             } else {
                 for(int d=0; d<DIM+2; ++d){
                     FijGhosts[ii][d] = -FijGhosts[iij][d];

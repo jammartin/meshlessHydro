@@ -2,8 +2,7 @@
 SHELL := /bin/bash
 
 # Set compiler
-#CXX := mpic++
-CXX := g++
+CXX := mpic++
 
 TRGTDIR := bin
 TARGET := mlh
@@ -31,9 +30,9 @@ OBJECTS := $(SOURCES:$(SRCDIR)/%.$(SRCEXT)=$(OBJDIR)/%.$(OBJEXT))
 MAIN := main
 
 # setting general flags
-CXXFLAGS := -std=c++11 -O3 -I$(INCLDIR) -I$(HOLIB) #-I/usr/include/hdf5/openmpi -Xpreprocessor -fopenmp
+CXXFLAGS := -std=c++11 -O3 -I../../boost_installation/include -I$(INCLDIR) -I$(HOLIB) -I/usr/include/hdf5/serial  #-Xpreprocessor -fopenmp
 # setting linker flags
-LDFLAGS := -std=c++11 -lhdf5 -lboost_filesystem -llapack -lblas #-lboost_mpi -lboost_serialization -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi
+LDFLAGS := -std=c++11 -L../../boost_installation/lib -L/usr/lib/x86_64-linux-gnu/hdf5/serial -lhdf5 -lboost_filesystem -llapack -lblas #-lboost_mpi -lboost_serialization -L/usr/lib/x86_64-linux-gnu/hdf5/openmpi
 
 # get kernel name to be able to run sed correctly on Darwin (MacOS) or Linux kernels
 KERNEL := $(shell uname -s)
@@ -85,6 +84,7 @@ include $(DEPENDS)
 
 prepare-run:
 	@mkdir -p output
+	@mkdir -p log
 
 # build module as shared library and install it on your system
 install: prepare-run | $(HOLIB)

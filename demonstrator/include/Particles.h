@@ -77,7 +77,15 @@ public:
 
     void calcdE(const Particles &ghostParticles, const double &kernelSize);
 
+    // For HLLC solver: Calculate norm vector between two particles:
+    // n_unit needs to be pre-allocated
+    void calcNunit(const int i, const int j, double* n_unit);
+
 #if PERIODIC_BOUNDARIES
+    // For HLLC solver: Calculate norm vector between two particles:
+    // n_unit needs to be pre-allocated
+    void calcNunit(const Particles &ghostParticles, const int i, const int j, double* n_unit);
+
     // Computes the density via kernel smoothing w/ ghost particles
     void compDensitySPH(const Particles &ghostParticles, const double &kernelSize);
 
@@ -91,7 +99,6 @@ public:
     void calcdndrho(const Particles &ghostParticles, const double &kernelSize);
 
     void calcdE(const double &kernelSize);
-
 #endif
 
 #if ARTVISC
