@@ -7,11 +7,14 @@
 
 #include "parameter.h"
 #include "Helper.h"
-
+//#include "riemannhelper.h"
 
 class HLLC {
 
 public:
+
+    //HLLC(double *WR, double *WL, double *vFrame, double *Aij, double *n_unit, int i);
+
     // Method solve: eqivalent to riemann_solve_for_flux in SWIFT, BUT:
     // Takes velocities in the frame of reference of the interface (already boosted)
     // Returns the de-boosted fluxes that are not yet rotated to the interface frame
@@ -23,7 +26,9 @@ public:
     // @param vij velocity vector of the interface
     // @param Fij flux vector to store the solution in
 
-    void solve(const double *WL, const double *WR, const double *n_unit,
-                                        const double *vij, double *Fij);
-}
+    static void solveHLLC(const double *WL, const double *WR, const double *n_unit,
+                                        const double *vij, const double &gamma, double *Fij);
+// private:
+//     int j;
+};
 #endif

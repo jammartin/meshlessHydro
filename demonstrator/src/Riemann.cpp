@@ -3,16 +3,19 @@
 //
 
 #include "../include/Riemann.h"
+//#include "../include/riemannhelper.h"
+
 
 Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij,
+
 #if USE_HLLC
-                                                        double *n_unit,
+                                                            double *nUnit,
 #endif
                                                                 int i) :
 
                     WR { WR }, WL { WL }, vFrame { vFrame },  Aij { Aij },
 #if USE_HLLC
-                                                        n_unit {n_unit},
+                                                        nUnit {nUnit},
 #endif
                                                                 i { i }{
 
@@ -91,11 +94,9 @@ Riemann::Riemann(double *WR, double *WL, double *vFrame, double *Aij,
 
 
 // Add HLLC function for approximate Riemann Solver
-void HLLC(double *Fij, const double &gamma){
+void Riemann::HLLCFlux(double *Fij, const double &gamma){
 
-
-    HLLC:solve(WL, WR, n_unit, vij, Fij);
-
+    HLLC::solveHLLC(WL, WR, nUnit, vFrame, gamma, Fij);
 // Rotate and prpject fluxes onto Aij
 #if DIM==3
         rotateAndProjectFluxes3D(Fij, gamma);
