@@ -47,7 +47,9 @@ public:
 
     // void HLLC(const double *WL, const double *WR, const double *nUnit,
     //                                    const double *vij, const double &gamma, double *Fij);
+#if USE_HLLC
     void HLLCFlux(double *Fij, const double &gamma);
+#endif
 
 private:
 #if USE_HLLC
@@ -56,7 +58,7 @@ private:
 
     int i;
     double *WR, *WL, *vFrame, *Aij;
-    double rhoSol, vSol[DIM], PSol;
+    double rhoSol, vSol[DIM], PSol, AijNorm;
     double hatAij[DIM];
     double unitX[DIM] = { 1, 0
 #if DIM==3

@@ -16,18 +16,22 @@ public:
     //HLLC(double *WR, double *WL, double *vFrame, double *Aij, double *n_unit, int i);
 
     // Method solve: eqivalent to riemann_solve_for_flux in SWIFT, BUT:
-    // Takes velocities in the frame of reference of the interface (already boosted)
-    // Returns the de-boosted fluxes that are not yet rotated to the interface frame
+    // Takes data in the frame of reference of the interface (already boosted)
+    // Returns the boosted fluxes that are not yet rotated to the interface frame
     // Also, not yet projected onto the faces
 
-    // @param WL the left state vector
-    // @param WR the right state vector
+    // @param rhoL, uL, PL ... rho, u and P on the left hand side.
     // @param n_unit normal vector of the interface
-    // @param vij velocity vector of the interface
     // @param Fij flux vector to store the solution in
 
-    static void solveHLLC(const double *WL, const double *WR, const double *n_unit,
-                                        const double *vij, const double &gamma, double *Fij);
+    // static void solveHLLC(double rhoL, double uL, double PL, double rhoR, double uR, double PR,
+    //                     const double &gamma, double *Fij);
+
+
+    // Second try
+    // Method solve: eqivalent to riemann_solve_for_flux in SWIFT, BUT:
+    static void solveHLLC(double *WL, double *WR, double *n, double *totflux,
+            const double *vij, const double &hydro_gamma);
 // private:
 //     int j;
 };

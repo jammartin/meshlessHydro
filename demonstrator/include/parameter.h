@@ -36,7 +36,7 @@
 #define PSI_2 .25           // TODO: move to config
 
 /// meshless finite mass method instead of meshless finite volume
-#define MESHLESS_FINITE_MASS 1
+#define MESHLESS_FINITE_MASS 0
 
 // Use HLLC solver for EOS != ideal gas
 #define USE_HLLC 1

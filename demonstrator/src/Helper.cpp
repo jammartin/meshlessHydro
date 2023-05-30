@@ -4,6 +4,8 @@
 
 #include "../include/Helper.h"
 
+
+
 void Helper::inverseMatrix(double *A, int N){
     //int *IPIV = new int[N];
     int LWORK = N*N;

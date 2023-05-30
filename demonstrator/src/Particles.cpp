@@ -1833,22 +1833,22 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
         //
         for (int j=0; j<noi[i]; ++j){
             int ii = i*MAX_NUM_INTERACTIONS+j; // interaction index
-            if (i == 9 && j == 11){
-                Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", j = " << nnl[ii];
-                Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
-                             << x[nnl[ii]] << ", " << y[nnl[ii]] << "] , vi = ["
-                             << vx[i] << ", " << vy[i] << "], vj = ["
-                             << vx[nnl[ii]] << ", " << vy[nnl[ii]] << "]";
-                Logger(DEBUG) << "vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
-                Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
-                             << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
-                             << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
-                             << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
-            }
+            // if (i == 9 && j == 11){
+            //     Logger(DEBUG) << "i = " << i << ", ii = " << ii << ", j = " << nnl[ii];
+            //     Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "], xj = ["
+            //                  << x[nnl[ii]] << ", " << y[nnl[ii]] << "] , vi = ["
+            //                  << vx[i] << ", " << vy[i] << "], vj = ["
+            //                  << vx[nnl[ii]] << ", " << vy[nnl[ii]] << "]";
+            //     Logger(DEBUG) << "vFrame = [" << vFrame[ii][0] << ", " << vFrame[ii][1] << "]";
+            //     Logger(DEBUG) << "rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
+            //                  << ", uL = " << WijL[ii][2] << ", uR = " << WijR[ii][2]
+            //                  << ", PL = " << WijL[ii][1] << ", PR = " << WijR[ii][1]
+            //                  << ", Aij = [" << Aij[ii][0] << ", " << Aij[ii][1] << "]";
+            // }
 
             // Logger(DEBUG) << "*WR = " << WijR[ii] << ", *WL = " << WijL[ii];
             // Logger(DEBUG) << "i = " << i << ", j = " << nnl[ii] << ", PR = " << WijR[ii][1] << ", PL = " << WijL[ii][1];
-
+            //
             if(WijR[ii][1] < 0. || WijL[ii][1] < 0.){
                 Logger(WARN) << "Negative pressure encountered@(i = " << i << ", j = " << j << ") Very bad :( !!";
                 Logger(DEBUG) << "    > rhoL = " << WijL[ii][0] << ", rhoR = " << WijR[ii][0]
@@ -1976,15 +1976,15 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
         for(int j=0; j<noi[i]; ++j){
             int ii = j+i*MAX_NUM_INTERACTIONS;
-            //double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
+            double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
 
             /// MASS FLUXES
             //mF[i] += AijNorm*Fij[ii][0];
             mF[i] += Fij[ii][0];
 
-            //Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
-            //          << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
-            //          << ", mF[ii] = " << Fij[ii][0] << ", AijNorm = " << AijNorm;
+            Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
+                     << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
+                     << ", mF[ii] = " << Fij[ii][0] << ", AijNorm = " << AijNorm;
 
             /// VELOCITY FLUXES
             // add de-boosted velocities
