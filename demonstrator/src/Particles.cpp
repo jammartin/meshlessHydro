@@ -1892,6 +1892,7 @@ void Particles::solveRiemannProblems(const double &gamma, const Particles &ghost
                 calcNunit(i, ii, n_unit);
                 Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii], n_unit, i};
                 solver.HLLCFlux(Fij[ii], gamma);
+                // Logger(DEBUG) << "i = " << i << " j = " << nnl[ii] << " mF = " << Fij[ii][0];
 #else
                 Riemann solver { WijL[ii], WijR[ii], vFrame[ii], Aij[ii] , i };
                 solver.exact(Fij[ii], gamma);
@@ -1976,15 +1977,18 @@ void Particles::collectFluxes(Helper &helper, const Particles &ghostParticles){
 
         for(int j=0; j<noi[i]; ++j){
             int ii = j+i*MAX_NUM_INTERACTIONS;
-            double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
+            // double AijNorm = sqrt(Helper::dotProduct(Aij[ii], Aij[ii]));
 
             /// MASS FLUXES
             //mF[i] += AijNorm*Fij[ii][0];
             mF[i] += Fij[ii][0];
 
-            Logger(DEBUG) << "xi = [" << x[i] << ", " << y[i] << "]"
-                     << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
-                     << ", mF[ii] = " << Fij[ii][0] << ", AijNorm = " << AijNorm;
+            // Logger(DEBUG) << " i: " << i << " xi = [" << x[i] << ", " << y[i] << "]"
+            //          << ", xj = [" << x[nnl[ii]] << ", " << y[nnl[ii]] << "]"
+            //          << ", mF[ii] = " << Fij[ii][0] << ", AijNorm = " << AijNorm;
+
+            // Debug mF = nan
+            // Logger(DEBUG) << " i: " << i << " j: " << nnl[ii] << " mF[ii] = " << Fij[ii][0];
 
             /// VELOCITY FLUXES
             // add de-boosted velocities

@@ -104,6 +104,7 @@ void Riemann::HLLCFlux(double *Fij, const double &gamma){
 #else
         HLLC::solveHLLC(WL, WR, hatAij, Fij, vFrame, gamma);
 
+        // Logger(DEBUG) << "i = " << i << " mF = " << Fij[0];
         // Rotate fluxes back into the Aij-direction:
         double LambdaInv[DIM*DIM];
 
@@ -111,22 +112,18 @@ void Riemann::HLLCFlux(double *Fij, const double &gamma){
         Helper::rotationMatrix2D(unitX, hatAij, LambdaInv);
 
         // Buffer velocity fluxes
-        double FijBuf[DIM] = { Fij[1], Fij[2] };
+        double FijBuf[DIM] = { Fij[2], Fij[3] };
 
         // Rotate fluxes: Eq A7
-        Fij[1] = LambdaInv[0]*FijBuf[0]+LambdaInv[1]*FijBuf[1];
-        Fij[2] = LambdaInv[2]*FijBuf[0]+LambdaInv[3]*FijBuf[1];
+        Fij[2] = LambdaInv[0]*FijBuf[0]+LambdaInv[1]*FijBuf[1];
+        Fij[3] = LambdaInv[2]*FijBuf[0]+LambdaInv[3]*FijBuf[1];
 
         double vFrame2 = pow(vFrame[0], 2) + pow(vFrame[1], 2);
 
+
         // Project onto effective faces:
         Fij[0] *= AijNorm;
-
-#if DIM == 3
-        Fij[4] *= AijNorm;
-#else
-        Fij[3] *= AijNorm;
-#endif
+        Fij[1] *= AijNorm;
 
 //         // Option 1: Hadamarf product
 //         Fij[1] *= Aij[0];
@@ -136,26 +133,20 @@ void Riemann::HLLCFlux(double *Fij, const double &gamma){
 // #endif
 
         // Option 2: multiply with norm
-        Fij[1] *= AijNorm;
         Fij[2] *= AijNorm;
-#if DIM == 3
         Fij[3] *= AijNorm;
+#if DIM == 3
+        Fij[4] *= AijNorm;
 #endif
 
         // De-boost into lab frame. Eq. A8:
-#if DIM == 3
-        Fij[4] += 0.5 * vFrame2 * Fij[0] +
+        Fij[1] += 0.5 * vFrame2 * Fij[0] +
             vFrame[0] * Fij[1] + vFrame[1] * Fij[2] + vFrame[2] * Fij[3];
-#else
-        Fij[3] += 0.5 * vFrame2 * Fij[0] +
-            vFrame[0] * Fij[1] + vFrame[1] * Fij[2];
-#endif
 
-
-        Fij[1] += vFrame[0] * Fij[0];
-        Fij[2] += vFrame[1] * Fij[0];
+        Fij[2] += vFrame[0] * Fij[0];
+        Fij[3] += vFrame[1] * Fij[0];
 #if DIM == 3
-        Fij[3] += vFrame[2] * Fij[0];
+        Fij[4] += vFrame[3] * Fij[0];
 #endif
 #endif
 }

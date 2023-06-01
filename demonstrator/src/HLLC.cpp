@@ -30,33 +30,29 @@ void HLLC::solveHLLC(double *WL, double *WR, double *n,
 
     // Step 0: velocity in interface frame
 #if DIM == 3
-    const double uL = WL[1] * n[0] + WL[2] * n[1] + WL[3] * n[2];
-    const double uR = WR[1] * n[0] + WR[2] * n[1] + WR[3] * n[2];
+    const double uL = WL[2] * n[0] + WL[3] * n[1] + WL[4] * n[2];
+    const double uR = WR[3] * n[0] + WR[3] * n[1] + WR[4] * n[2];
 #else
-    const double uL = WL[1] * n[0] + WL[2] * n[1];
-    const double uR = WR[1] * n[0] + WR[2] * n[1];
+    const double uL = WL[2] * n[0] + WL[3] * n[1];
+    const double uR = WR[2] * n[0] + WR[3] * n[1];
 #endif
-
     const double rhoLinv = (WL[0] > 0.0d) ? 1.0d / WL[0] : 0.0d;
     const double rhoRinv = (WR[0] > 0.0d) ? 1.0d / WR[0] : 0.0d;
+    // Logger(DEBUG) << "WL[1]: " << WL[1] << " rhoLinv: " << rhoLinv;
 
-#if DIM == 3
-    const double aL = sqrtf(hydro_gamma * WL[4] * rhoLinv);
-    const double aR = sqrtf(hydro_gamma * WR[4] * rhoRinv);
-#else
-    const double aL = sqrtf(hydro_gamma * WL[3] * rhoLinv);
-    const double aR = sqrtf(hydro_gamma * WR[3] * rhoRinv);
-#endif
+    const double aL = sqrtf(hydro_gamma * WL[1] * rhoLinv);
+    const double aR = sqrtf(hydro_gamma * WR[1] * rhoRinv);
+
+
+    // Logger(DEBUG) << "aL^2: " << hydro_gamma * WL[1] * rhoLinv;
+    // Logger(DEBUG) << "aL: " << sqrtf(hydro_gamma * WL[1] * rhoLinv);
+
 
     /* STEP 1: pressure estimate */
     const double rhobar = WL[0] + WR[0];
     const double abar = aL + aR;
-    const double pPVRS =
-#if DIM == 3
-        0.5d * ((WL[4] + WR[4]) - 0.25d * (uR - uL) * rhobar * abar);
-#else
-        0.5d * ((WL[3] + WR[3]) - 0.25d * (uR - uL) * rhobar * abar);
-#endif
+    const double pPVRS = 0.5d * ((WL[1] + WR[1]) - 0.25d * (uR - uL) * rhobar * abar);
+
     const double pstar = std::max(0.0d, pPVRS);
 
     /* STEP 2: wave speed estimates
@@ -79,21 +75,24 @@ void HLLC::solveHLLC(double *WL, double *WR, double *n,
         (WL[0] * SLmuL - WR[0] * SRmuR);
 #else
     double qL = 1.0d;
-    if (pstar > WL[3] && WL[3] > 0.0d) {
+    if (pstar > WL[1] && WL[1] > 0.0d) {
       qL = sqrtf(1.0d + 0.5d * hydro_gamma_plus_one * hydro_one_over_gamma *
-                            (pstar / WL[3] - 1.0d));
+                            (pstar / WL[1] - 1.0d));
     }
     double qR = 1.0d;
-    if (pstar > WR[3] && WR[3] > 0.0d) {
+    if (pstar > WR[1] && WR[1] > 0.0d) {
       qR = sqrtf(1.0d + 0.5d * hydro_gamma_plus_one * hydro_one_over_gamma *
-                            (pstar / WR[3] - 1.0d));
+                            (pstar / WR[1] - 1.0d));
     }
     const double SLmuL = -aL * qL;
     const double SRmuR = aR * qR;
     const double Sstar =
-        (WR[3] - WL[3] + WL[0] * uL * SLmuL - WR[0] * uR * SRmuR) /
+        (WR[1] - WL[1] + WL[0] * uL * SLmuL - WR[0] * uR * SRmuR) /
         (WL[0] * SLmuL - WR[0] * SRmuR);
 #endif
+    // Logger(DEBUG) <<  "SStar: " << Sstar;
+    // Logger(DEBUG) << "SLmuL: " << SLmuL;
+    // Logger(DEBUG) << "aR: " << aR << "SRmuR: " << SRmuR;
 
     /* STEP 3: HLLC flux in a frame moving with the interface velocity */
 #if DIM == 3
@@ -116,17 +115,17 @@ void HLLC::solveHLLC(double *WL, double *WR, double *n,
 
         if (SL < 0.0d) {
 
-          const double starfac = SLmuL / (SL - Sstar);
-          const double rhoLSL = WL[0] * SL;
-          const double SstarmuL = Sstar - uL;
-          const double rhoLSLstarfac = rhoLSL * (starfac - 1.0d);
-          const double rhoLSLSstarmuL = rhoLSL * SstarmuL * starfac;
+            const double starfac = SLmuL / (SL - Sstar);
+            const double rhoLSL = WL[0] * SL;
+            const double SstarmuL = Sstar - uL;
+            const double rhoLSLstarfac = rhoLSL * (starfac - 1.0d);
+            const double rhoLSLSstarmuL = rhoLSL * SstarmuL * starfac;
 
-          totflux[0] += rhoLSLstarfac;
-          totflux[1] += rhoLSLstarfac * WL[1] + rhoLSLSstarmuL * n[0];
-          totflux[2] += rhoLSLstarfac * WL[2] + rhoLSLSstarmuL * n[1];
-          totflux[3] += rhoLSLstarfac * WL[3] + rhoLSLSstarmuL * n[2];
-          totflux[4] += rhoLSLstarfac * eL +
+            totflux[0] += rhoLSLstarfac;
+            totflux[1] += rhoLSLstarfac * WL[1] + rhoLSLSstarmuL * n[0];
+            totflux[2] += rhoLSLstarfac * WL[2] + rhoLSLSstarmuL * n[1];
+            totflux[3] += rhoLSLstarfac * WL[3] + rhoLSLSstarmuL * n[2];
+            totflux[4] += rhoLSLstarfac * eL +
                         rhoLSLSstarmuL * (Sstar + WL[4] / (WL[0] * SLmuL));
         }
       } else {
@@ -145,79 +144,83 @@ void HLLC::solveHLLC(double *WL, double *WR, double *n,
 
         if (SR > 0.0d) {
 
-          const double starfac = SRmuR / (SR - Sstar);
-          const double rhoRSR = WR[0] * SR;
-          const double SstarmuR = Sstar - uR;
-          const double rhoRSRstarfac = rhoRSR * (starfac - 1.f);
-          const double rhoRSRSstarmuR = rhoRSR * SstarmuR * starfac;
+            const double starfac = SRmuR / (SR - Sstar);
+            const double rhoRSR = WR[0] * SR;
+            const double SstarmuR = Sstar - uR;
+            const double rhoRSRstarfac = rhoRSR * (starfac - 1.f);
+            const double rhoRSRSstarmuR = rhoRSR * SstarmuR * starfac;
 
-          totflux[0] += rhoRSRstarfac;
-          totflux[1] += rhoRSRstarfac * WR[1] + rhoRSRSstarmuR * n[0];
-          totflux[2] += rhoRSRstarfac * WR[2] + rhoRSRSstarmuR * n[1];
-          totflux[3] += rhoRSRstarfac * WR[3] + rhoRSRSstarmuR * n[2];
-          totflux[4] += rhoRSRstarfac * eR +
+            totflux[0] += rhoRSRstarfac;
+            totflux[1] += rhoRSRstarfac * WR[1] + rhoRSRSstarmuR * n[0];
+            totflux[2] += rhoRSRstarfac * WR[2] + rhoRSRSstarmuR * n[1];
+            totflux[3] += rhoRSRstarfac * WR[3] + rhoRSRSstarmuR * n[2];
+            totflux[4] += rhoRSRstarfac * eR +
                         rhoRSRSstarmuR * (Sstar + WR[4] / (WR[0] * SRmuR));
         }
     }
 #else
     if (Sstar >= 0.0d) {
+        // Logger(DEBUG) << "SStar >= 0";
         const double rhoLuL = WL[0] * uL;
-        const double v2 = WL[1] * WL[1] + WL[2] * WL[2];
+        const double v2 = WL[2] * WL[2] + WL[3] * WL[3];
         //const double v2 = uL * uL;
         const double eL =
-            WL[3] * rhoLinv * hydro_one_over_gamma_minus_one + 0.5d * v2;
+            WL[1] * rhoLinv * hydro_one_over_gamma_minus_one + 0.5d * v2;
         const double SL = SLmuL + uL;
 
         /* flux FL */
         totflux[0] = rhoLuL;
         /* these are the actual correct fluxes in the boosted lab frame
            (not rotated to interface frame) */
-        totflux[1] = rhoLuL * WL[1] + WL[4] * n[0];
-        totflux[2] = rhoLuL * WL[2] + WL[4] * n[1];
-        totflux[3] = rhoLuL * eL + WL[4] * uL;
+        totflux[1] = rhoLuL * eL + WL[1] * uL;
+        totflux[2] = rhoLuL * WL[2] + WL[1] * n[0];
+        totflux[3] = rhoLuL * WL[3] + WL[1] * n[1];
 
         if (SL < 0.0d) {
+            // Logger(DEBUG) << "SL < 0";
+            const double starfac = SLmuL / (SL - Sstar);
+            const double rhoLSL = WL[0] * SL;
+            const double SstarmuL = Sstar - uL;
+            const double rhoLSLstarfac = rhoLSL * (starfac - 1.0d);
+            const double rhoLSLSstarmuL = rhoLSL * SstarmuL * starfac;
 
-          const double starfac = SLmuL / (SL - Sstar);
-          const double rhoLSL = WL[0] * SL;
-          const double SstarmuL = Sstar - uL;
-          const double rhoLSLstarfac = rhoLSL * (starfac - 1.0d);
-          const double rhoLSLSstarmuL = rhoLSL * SstarmuL * starfac;
-
-          totflux[0] += rhoLSLstarfac;
-          totflux[1] += rhoLSLstarfac * WL[1] + rhoLSLSstarmuL * n[0];
-          totflux[2] += rhoLSLstarfac * WL[2] + rhoLSLSstarmuL * n[1];
-          totflux[3] += rhoLSLstarfac * eL +
-                        rhoLSLSstarmuL * (Sstar + WL[3] / (WL[0] * SLmuL));
+            totflux[0] += rhoLSLstarfac;
+            totflux[1] += rhoLSLstarfac * eL +
+                rhoLSLSstarmuL * (Sstar + WL[1] / (WL[0] * SLmuL));
+            totflux[2] += rhoLSLstarfac * WL[2] + rhoLSLSstarmuL * n[0];
+            totflux[3] += rhoLSLstarfac * WL[3] + rhoLSLSstarmuL * n[1];
         }
-      } else {
+    } else {
+        // Logger(DEBUG) << "SStar < 0";
         const double rhoRuR = WR[0] * uR;
-        const double v2 = WR[1] * WR[1] + WR[2] * WR[2];
+        const double v2 = WR[2] * WR[2] + WR[3] * WR[3];
         const double eR =
-            WR[3] * rhoRinv * hydro_one_over_gamma_minus_one + 0.5d * v2;
+            WR[1] * rhoRinv * hydro_one_over_gamma_minus_one + 0.5d * v2;
         const double SR = SRmuR + uR;
 
         /* flux FR */
         totflux[0] = rhoRuR;
-        totflux[1] = rhoRuR * WR[1] + WR[4] * n[0];
-        totflux[2] = rhoRuR * WR[2] + WR[4] * n[1];
-        totflux[3] = rhoRuR * eR + WR[3] * uR;
+        totflux[1] = rhoRuR * eR + WR[1] * uR;
+        totflux[2] = rhoRuR * WR[2] + WR[1] * n[0];
+        totflux[3] = rhoRuR * WR[3] + WR[1] * n[1];
 
         if (SR > 0.0d) {
-
-          const double starfac = SRmuR / (SR - Sstar);
-          const double rhoRSR = WR[0] * SR;
-          const double SstarmuR = Sstar - uR;
-          const double rhoRSRstarfac = rhoRSR * (starfac - 1.f);
-          const double rhoRSRSstarmuR = rhoRSR * SstarmuR * starfac;
-
-          totflux[0] += rhoRSRstarfac;
-          totflux[1] += rhoRSRstarfac * WR[1] + rhoRSRSstarmuR * n[0];
-          totflux[2] += rhoRSRstarfac * WR[2] + rhoRSRSstarmuR * n[1];
-          totflux[3] += rhoRSRstarfac * eR +
-                        rhoRSRSstarmuR * (Sstar + WR[3] / (WR[0] * SRmuR));
+            // Logger(INFO) << "SR > 0";
+            const double starfac = SRmuR / (SR - Sstar);
+            const double rhoRSR = WR[0] * SR;
+            const double SstarmuR = Sstar - uR;
+            const double rhoRSRstarfac = rhoRSR * (starfac - 1.d);
+            const double rhoRSRSstarmuR = rhoRSR * SstarmuR * starfac;
+            //Logger(DEBUG) << Sstar;
+            totflux[0] += rhoRSRstarfac;
+            totflux[1] += rhoRSRstarfac * eR +
+                rhoRSRSstarmuR * (Sstar + WR[1] / (WR[0] * SRmuR));
+            totflux[2] += rhoRSRstarfac * WR[2] + rhoRSRSstarmuR * n[0];
+            totflux[3] += rhoRSRstarfac * WR[3] + rhoRSRSstarmuR * n[1];
         }
+
     }
+    // Logger(DEBUG) << totflux[0];
 
 #endif // IF DIM == 3
 
