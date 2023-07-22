@@ -30,8 +30,15 @@ public:
 
     // Second try
     // Method solve: eqivalent to riemann_solve_for_flux in SWIFT, BUT:
-    static void solveHLLC(double *WL, double *WR, double *n, double *totflux,
+    // static void solveHLLC0(double *WL, double *WR, double *n, double *totflux,
+    //         const double *vij, const double &hydro_gamma);
+
+    static void solveHLLC1(double *WL, double *WR, double *n, double *totflux,
             const double *vij, const double &hydro_gamma);
+
+    // HLL Solver
+    static void HLL(double *WL, double *WR, double *totflux, const double &hydro_gamma);
+    
 // private:
 //     int j;
 };

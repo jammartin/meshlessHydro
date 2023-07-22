@@ -15,14 +15,14 @@
 #define ADAPTIVE_TIMESTEP 1
 
 /// define Courant-Friedrichs-Levy number, should be smaller than 1
-#define CFL .2              // TODO: move to config
+#define CFL .4              // TODO: move to config
 
 /// maximum number of interactions for each particle
-#define MAX_NUM_INTERACTIONS 120
+#define MAX_NUM_INTERACTIONS 400
 /** maximum interactions with ghost particles
  *  ignored when `PERIODIC_BOUNDARIES` is not set
 **/
-#define MAX_NUM_GHOST_INTERACTIONS 150
+#define MAX_NUM_GHOST_INTERACTIONS 300
 
 /// flag for slope limiting, 0: no slope limiting
 #define SLOPE_LIMITING 1
@@ -31,25 +31,9 @@
 #define BETA 4.             // TODO: move to config
 
 /// use pairwise limiter
-#define PAIRWISE_LIMITER 1
+#define PAIRWISE_LIMITER 0
 #define PSI_1 .5            // TODO: move to config
 #define PSI_2 .25           // TODO: move to config
-
-/// meshless finite mass method instead of meshless finite volume
-#define MESHLESS_FINITE_MASS 0
-
-
-// Use HLLC or HLL solver for EOS != ideal gas
-#define USE_HLLC 1
-
-// Use HLL solver
-#define USE_HLL 0
-
-// Use Roe Average for HLL solver. Otherwise direct estimate is used.
-#define USE_ROE 1
-
-// Convert HLL(C) flux to primitive vars for debugging
-#define DEBUG_HLL 1
 
 /// enforcing flux symmetry by only calculating on side
 #define ENFORCE_FLUX_SYM 1
@@ -60,33 +44,21 @@
 /** define debug level to enable additional output:
  * 0: no debug additions
  * 1: additional checks
- * 2: dump NNL and ghosts to files (this should not be used for large amounts of particles)
+ * 2: dump NNL and ghosts to files
 **/
 #define DEBUG_LVL 1
 
 /// use first order quadrature point for Riemann problems
 #define FIRST_ORDER_QUAD_POINT 1
 
-/// define if code should run as SPH, which ignores most of the directives above
-#define RUNSPH 0
-
-/// define if arificial viscosity should be employed
-#define ARTVISC 1
-
-/// artificial viscosity parameters
-#define ALPHA_VISC 1
-#define BETA_VISC 2
-#define EPSMU .01
-
 /// define verbosity for each VERBOSITY_PARTICLES particles
 // TODO: use this flag when debug level 1
 #define VERBOSITY_PARTICLES 10
 
-/// deprecated, ENFORCE_FLUX_SYM should be set to 1
-// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
+/// define how much tolerance of flux antisymmetry is allowed in checkFluxSymmetry
 #define FLUX_SYM_TOL 1e-20
 
-// using pressure floor to avoid predicting negative pressures
+/// using pressure floor to avoid predicting negative pressures
 //#define PRESSURE_FLOOR 1e-8
 
 #endif //DEMONSTRATOR_PARAMETER_H

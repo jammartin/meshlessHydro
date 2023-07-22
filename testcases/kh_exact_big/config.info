@@ -1,25 +1,22 @@
 ; h5 file containing the initial particle distribution
 ;initFile ../testcases/kelvin-helmholtz/khN16384.h5
 ;initFile ../testcases/kelvin-helmholtz_hllc/khN900.h5
-initFile ../testcases/kh_hllc_big/khN16384.h5
+initFile ../testcases/kh_exact_big/khN16384.h5
 
 ; output directory for particle distribution h5 files
 ;outDir output
-outDir ../testcases/kh_hllc_big/output
-;outDir ../testcases/kh_exact_big/output
-;outDir ../testcases/kh_sph_big/output
-
+outDir ../testcases/kh_exact_big/output
 ; fixed time step
 ; when ADAPTIVE_TIMESTEP is set in parameter.h,
 ; this gives the output timesteps combined with h5DumpInterval
-timeStep .05
+timeStep .005
 
 ; end of the simulation
-;timeEnd .05
-timeEnd 5
+;timeEnd .005
+timeEnd 2
 
 ; output particle distribution each h5DumpInterval steps
-h5DumpInterval 2
+h5DumpInterval 1
 
 ; periodic boundaries of box
 ; ignored when PERIODIC_BOUNDARIES is not set in parameter.h

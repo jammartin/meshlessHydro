@@ -17,11 +17,7 @@ class Riemann {
 
 public:
     /// WR, WL and Aij must be pre-allocated
-    Riemann(double *WR, double *WL, double *vFrame, double *Aij,
-#if USE_HLLC
-                                                double *nUnit,
-#endif
-                                                        int i);
+    Riemann(double *WR, double *WL, double *vFrame, double *Aij, int i);
 
     /**
      * Solving a one-dimensional Riemann problem for an ideal gas
